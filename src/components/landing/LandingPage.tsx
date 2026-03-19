@@ -97,7 +97,7 @@ export default function LandingPage() {
               <button
                 key={chat.id}
                 onClick={() => router.push(`/chat/${chat.id}`)}
-                className="w-full flex items-baseline justify-between py-3 group text-left hover:opacity-60 transition-opacity duration-150"
+                className="w-full flex items-baseline justify-between py-3 px-3 -mx-3 rounded-lg group text-left hover:bg-ink/5 transition-colors duration-150"
               >
                 <div className="flex-1 min-w-0 pr-6">
                   <span className="text-sm text-ink font-normal block truncate">
