@@ -1,23 +1,39 @@
 import fs from "fs";
 import path from "path";
 import type { HistoryExcerpt } from "@/types";
+import { embedText } from "./embed";
+import { searchChunks } from "./vectordb";
 
 const DATA_PATH = process.env.DATA_PATH || "./data";
 
-// v1: keyword search over all past MD files
 export async function semanticSearch(
   query: string,
   excludeChatId?: string,
   limit = 5
 ): Promise<HistoryExcerpt[]> {
+  // Vector path — only if VOYAGE_API_KEY is set
+  const embedding = await embedText(query);
+  if (embedding) {
+    const results = searchChunks(embedding, excludeChatId, limit);
+    if (results.length > 0) return results;
+  }
+
+  // Keyword fallback — covers chats from before embeddings were introduced
+  return keywordSearch(query, excludeChatId, limit);
+}
+
+function keywordSearch(
+  query: string,
+  excludeChatId?: string,
+  limit = 5
+): HistoryExcerpt[] {
   const chatsDir = path.join(DATA_PATH, "chats");
   if (!fs.existsSync(chatsDir)) return [];
 
   const keywords = query.toLowerCase().split(/\s+/).filter(Boolean);
   const results: Array<HistoryExcerpt & { score: number }> = [];
 
-  const chatIds = fs.readdirSync(chatsDir);
-  for (const chatId of chatIds) {
+  for (const chatId of fs.readdirSync(chatsDir)) {
     if (excludeChatId && chatId === excludeChatId) continue;
     const messagesPath = path.join(chatsDir, chatId, "messages.md");
     const metaPath = path.join(chatsDir, chatId, "meta.json");
@@ -28,7 +44,6 @@ export async function semanticSearch(
       ? JSON.parse(fs.readFileSync(metaPath, "utf-8"))
       : { title: chatId };
 
-    // Split into message blocks and score each
     const blocks = content.split(/^## /m).filter(Boolean);
     for (const block of blocks) {
       const lower = block.toLowerCase();

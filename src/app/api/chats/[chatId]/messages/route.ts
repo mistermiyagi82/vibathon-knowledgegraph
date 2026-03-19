@@ -8,6 +8,10 @@ import { getRecentMessages, getMessages, formatRecentMessages } from "@/lib/memo
 import { appendMessage, updateChatMeta } from "@/lib/storage/chats";
 import { listChatFiles, readFileContents } from "@/lib/storage/files";
 import { processConversation } from "@/lib/memory/processor";
+import { embedText } from "@/lib/memory/embed";
+import { indexChunk } from "@/lib/memory/vectordb";
+import fs from "fs";
+import path from "path";
 import type { Message, MessageContext } from "@/types";
 
 function getThinkingLabel(toolName: string): string {
@@ -155,6 +159,7 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
         await Promise.all([
           appendMessage(chatId, userMessage, assistantMessage, context),
           processConversation(chatId, userText, fullResponse).catch(() => {}),
+          indexExchange(chatId, userText, fullResponse, now).catch(() => {}),
         ]);
 
         let title: string | undefined;
@@ -185,6 +190,28 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
       Connection: "keep-alive",
     },
   });
+}
+
+async function indexExchange(
+  chatId: string,
+  userText: string,
+  assistantResponse: string,
+  timestamp: string
+): Promise<void> {
+  const excerpt = `User: ${userText.slice(0, 500)}\n\nClaude: ${assistantResponse.slice(0, 500)}`;
+  const embedding = await embedText(excerpt);
+  if (!embedding) return;
+
+  const DATA_PATH = process.env.DATA_PATH || "./data";
+  const metaPath = path.join(DATA_PATH, "chats", chatId, "meta.json");
+  let chatTitle: string | null = null;
+  try {
+    if (fs.existsSync(metaPath)) {
+      chatTitle = JSON.parse(fs.readFileSync(metaPath, "utf-8")).title ?? null;
+    }
+  } catch { /* non-critical */ }
+
+  indexChunk({ chatId, chatTitle, timestamp, excerpt, embedding });
 }
 
 async function generateTitle(firstMessage: string): Promise<string> {
