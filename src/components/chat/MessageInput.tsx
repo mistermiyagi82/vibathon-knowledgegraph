@@ -112,7 +112,10 @@ export default function MessageInput({ onSend, disabled, autoFocus, model, onMod
       )}
 
       {/* Container */}
-      <div className="bg-black/[0.05] rounded-2xl px-4 pt-3 pb-3">
+      <div
+        className="bg-black/[0.05] rounded-2xl px-4 pt-3 pb-3 cursor-text"
+        onClick={() => inputRef.current?.focus()}
+      >
         {/* Text input row */}
         <input
           ref={inputRef}
@@ -126,7 +129,7 @@ export default function MessageInput({ onSend, disabled, autoFocus, model, onMod
         />
 
         {/* Bottom row */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
           {/* + file button */}
           <label className="cursor-pointer text-ink/40 hover:text-ink/70 transition-colors duration-150 text-lg leading-none select-none font-light">
             +
