@@ -35,6 +35,7 @@ export default function ChatView({ chatId }: Props) {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentFirstRef = useRef(false);
+  const isStreamingRef = useRef(false);
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -74,8 +75,11 @@ export default function ChatView({ chatId }: Props) {
       if (res.status === 404) { router.push("/"); return; }
       if (!res.ok) return;
       const data = await res.json();
-      setMessages(data.messages || []);
-      setTimeout(scrollToBottom, 50);
+      // Don't overwrite temp messages if a stream is already in flight
+      if (!isStreamingRef.current) {
+        setMessages(data.messages || []);
+        setTimeout(scrollToBottom, 50);
+      }
     } catch {}
   }
 
@@ -115,6 +119,7 @@ export default function ChatView({ chatId }: Props) {
 
     setMessages((prev) => [...prev, tempUserMsg]);
     setNewMessageIds((prev) => [...prev, tempUserId]);
+    isStreamingRef.current = true;
     setIsStreaming(true);
     setStreamingContent("");
     setThinkingLabel("");
@@ -188,6 +193,7 @@ export default function ChatView({ chatId }: Props) {
               setNewMessageIds((prev) => [...prev, finalAssistantMsg.id]);
               setStreamingContent("");
               setThinkingLabel("");
+              isStreamingRef.current = false;
               setIsStreaming(false);
 
               if (payload.title) loadRecentChats();
@@ -201,6 +207,7 @@ export default function ChatView({ chatId }: Props) {
             }
 
             if (payload.error) {
+              isStreamingRef.current = false;
               setIsStreaming(false);
               setStreamingContent("");
               setMessages((prev) => [
@@ -212,6 +219,7 @@ export default function ChatView({ chatId }: Props) {
         }
       }
     } catch {
+      isStreamingRef.current = false;
       setIsStreaming(false);
       setStreamingContent("");
       setMessages((prev) => [
