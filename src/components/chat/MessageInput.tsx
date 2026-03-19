@@ -112,20 +112,18 @@ export default function MessageInput({ onSend, disabled, autoFocus, model, onMod
       )}
 
       {/* Container */}
-      <div className="bg-black/[0.05] rounded-2xl px-4 pt-3 pb-3">
-        {/* Text input row — wrapper captures clicks in the padding area too */}
-        <div className="cursor-text pb-3" onClick={() => inputRef.current?.focus()}>
-          <input
-            ref={inputRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSubmit()}
-            placeholder="Say something..."
-            className={`w-full bg-transparent text-sm text-ink font-normal outline-none placeholder:text-ink/30 caret-ink transition-opacity ${disabled ? "opacity-50" : ""}`}
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </div>
+      <div className="bg-black/[0.05] rounded-2xl px-4 pt-3 pb-3 cursor-text" onClick={() => inputRef.current?.focus()}>
+        {/* Text input row */}
+        <input
+          ref={inputRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSubmit()}
+          placeholder="Say something..."
+          className={`w-full bg-transparent text-sm text-ink font-normal outline-none placeholder:text-ink/30 caret-ink transition-opacity mb-3 ${disabled ? "opacity-50" : ""}`}
+          autoComplete="off"
+          spellCheck={false}
+        />
 
         {/* Bottom row */}
         <div className="flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
