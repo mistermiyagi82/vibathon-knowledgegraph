@@ -51,7 +51,12 @@ export function appendMessage(
   assistantMessage: Message,
   context: MessageContext
 ): void {
-  const filePath = path.join(chatDir(chatId), "messages.md");
+  const dir = chatDir(chatId);
+  fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(path.join(dir, "messages.md"))) {
+    fs.writeFileSync(path.join(dir, "messages.md"), "");
+  }
+  const filePath = path.join(dir, "messages.md");
   const attachmentLines = userMessage.attachments
     ?.map((f) => `[file: ${f.filename}](../../uploads/${chatId}/${f.filename})`)
     .join("\n") ?? "";
