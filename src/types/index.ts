@@ -7,6 +7,11 @@ export interface Chat {
   lastMessagePreview?: string;
 }
 
+export interface PerfEntry {
+  step: string;
+  ms: number;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
@@ -14,6 +19,8 @@ export interface Message {
   timestamp: string;
   attachments?: FileAttachment[];
   context?: MessageContext;
+  perf?: PerfEntry[];
+  model?: string;
 }
 
 export interface FileAttachment {

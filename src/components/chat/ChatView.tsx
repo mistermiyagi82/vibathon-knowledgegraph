@@ -30,6 +30,20 @@ export default function ChatView({ chatId }: Props) {
   const [contextMessage, setContextMessage] = useState<MessageContext | null>(null);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
 
+  const MODELS = [
+    { id: "claude-opus-4-6", label: "Opus 4.6" },
+    { id: "claude-sonnet-4-6", label: "Sonnet 4.6" },
+    { id: "claude-opus-4-5-20251101", label: "Opus 4.5" },
+    { id: "claude-sonnet-4-5-20250929", label: "Sonnet 4.5" },
+    { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5" },
+    { id: "claude-opus-4-1-20250805", label: "Opus 4.1" },
+    { id: "claude-opus-4-20250514", label: "Opus 4" },
+    { id: "claude-sonnet-4-20250514", label: "Sonnet 4" },
+    { id: "claude-3-haiku-20240307", label: "Haiku 3" },
+  ];
+  const [model, setModel] = useState(() => localStorage.getItem("selected-model") ?? "claude-sonnet-4-6");
+
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [recentChats, setRecentChats] = useState<Array<{ id: string; title: string }>>([]);
 
@@ -136,7 +150,7 @@ export default function ChatView({ chatId }: Props) {
       const res = await fetch(`/api/chats/${chatId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, model }),
       });
 
       if (!res.ok || !res.body) throw new Error("Stream failed");
@@ -184,6 +198,8 @@ export default function ChatView({ chatId }: Props) {
                 content: accumulated,
                 timestamp: new Date().toISOString(),
                 context,
+                perf: payload.perf,
+                model: model,
               };
 
               setMessages((prev) => [
@@ -213,7 +229,7 @@ export default function ChatView({ chatId }: Props) {
               setStreamingContent("");
               setMessages((prev) => [
                 ...prev,
-                { id: `err-${Date.now()}`, role: "assistant" as const, content: "Something went wrong. Please try again.", timestamp: new Date().toISOString() },
+                { id: `err-${Date.now()}`, role: "assistant" as const, content: `Error: ${payload.error}`, timestamp: new Date().toISOString() },
               ]);
             }
           } catch {}
@@ -277,6 +293,7 @@ export default function ChatView({ chatId }: Props) {
       />
     );
   }
+
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -357,7 +374,13 @@ export default function ChatView({ chatId }: Props) {
       {/* Input — centered */}
       <div className="shrink-0 pb-6 sm:pb-8 pt-2" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
         <div className="max-w-2xl mx-auto px-4 sm:px-6">
-          <MessageInput onSend={sendMessage} disabled={isStreaming} autoFocus />
+          <MessageInput
+            onSend={sendMessage}
+            disabled={isStreaming}
+            autoFocus
+            model={model}
+            onModelChange={(id) => { setModel(id); localStorage.setItem("selected-model", id); }}
+          />
         </div>
       </div>
 

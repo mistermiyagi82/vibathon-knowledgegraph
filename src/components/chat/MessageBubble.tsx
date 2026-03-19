@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
-import type { Message } from "@/types";
+import type { Message, PerfEntry } from "@/types";
 
 interface Props {
   message: Message;
@@ -45,10 +45,21 @@ export default function MessageBubble({ message, streaming, onOpenContext, isAct
         </div>
 
         {!streaming && (
-          <div className="mt-2">
-            <span className="text-xs text-muted/60">
-              {formatTimestamp(message.timestamp)}
-            </span>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="text-xs text-muted/60">{formatTimestamp(message.timestamp)}</span>
+            {message.model && (
+              <span className="text-[10px] font-mono text-muted/60">{message.model}</span>
+            )}
+            {message.perf?.map((p: PerfEntry, i: number) => (
+              <span key={i} className="text-[10px] font-mono text-muted/60 flex items-center gap-x-3">
+                <span className="text-muted/30 font-bold">→</span>{p.step}{p.ms >= 0 ? ` ${p.ms}ms` : ""}
+              </span>
+            ))}
+            {message.perf && message.perf.filter(p => p.ms >= 0).length > 1 && (
+              <span className="text-[10px] font-mono text-muted/60 flex items-center gap-x-3">
+                <span className="text-muted/30 font-bold">→</span>total {message.perf.filter(p => p.ms >= 0).reduce((sum, p) => sum + p.ms, 0)}ms
+              </span>
+            )}
           </div>
         )}
       </div>

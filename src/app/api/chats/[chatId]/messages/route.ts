@@ -1,7 +1,108 @@
 import { NextResponse } from "next/server";
 import { v4 as uuid } from "uuid";
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { anthropic, SYSTEM_PROMPT, MEMORY_TOOLS } from "@/lib/anthropic";
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const groq = new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" });
+
+const GROQ_MODELS = new Set(["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "meta-llama/llama-4-scout-17b-16e-instruct", "qwen/qwen3-32b", "moonshotai/kimi-k2-instruct", "groq/compound", "groq/compound-mini"]);
+const isOpenAIModel = (m: string) => m.startsWith("gpt-") || m.startsWith("o1") || m.startsWith("o3") || m.startsWith("o4");
+const isGroqModel = (m: string) => GROQ_MODELS.has(m);
+
+async function runOpenAICompatibleStream(
+  client: OpenAI,
+  model: string,
+  initialContent: string,
+  chatId: string,
+  context: MessageContext,
+  perf: { step: string; ms: number }[],
+  emit: (payload: object) => void,
+  t: () => number
+): Promise<string> {
+  const oaiTools: OpenAI.Chat.ChatCompletionTool[] = MEMORY_TOOLS.map((tool) => ({
+    type: "function" as const,
+    function: { name: tool.name, description: tool.description, parameters: tool.input_schema },
+  }));
+
+  const msgs: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "user", content: initialContent },
+  ];
+
+  let fullResponse = "";
+  let toolsSupported = true;
+
+  for (let i = 0; i < 5; i++) {
+    const start = t();
+    let firstToken = true;
+    let finishReason: string | null = null;
+    const toolCallAccumulator: Record<string, { name: string; args: string }> = {};
+
+    let oaiStream: AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
+    try {
+      oaiStream = await client.chat.completions.create({ model, stream: true, ...(toolsSupported ? { tools: oaiTools } : {}), messages: msgs });
+    } catch (err: unknown) {
+      if (toolsSupported && typeof err === "object" && err !== null && "status" in err && (err as { status: number }).status === 400) {
+        toolsSupported = false;
+        oaiStream = await client.chat.completions.create({ model, stream: true, messages: msgs });
+      } else { throw err; }
+    }
+
+    for await (const chunk of oaiStream) {
+      const delta = chunk.choices[0]?.delta;
+      finishReason = chunk.choices[0]?.finish_reason ?? finishReason;
+
+      if (delta?.tool_calls) {
+        for (const tc of delta.tool_calls) {
+          if (!toolCallAccumulator[tc.index]) {
+            toolCallAccumulator[tc.index] = { name: tc.function?.name ?? "", args: "" };
+            emit({ thinking: getThinkingLabel(tc.function?.name ?? "") });
+          }
+          toolCallAccumulator[tc.index].args += tc.function?.arguments ?? "";
+        }
+      }
+
+      if (delta?.content) {
+        if (firstToken) {
+          perf.push({ step: i === 0 ? "Time to first token" : "Time to first token (after tools)", ms: t() - start });
+          firstToken = false;
+        }
+        fullResponse += delta.content;
+        emit({ text: delta.content });
+      }
+    }
+
+    if (firstToken && Object.keys(toolCallAccumulator).length === 0) {
+      perf.push({ step: `API call ${i + 1}`, ms: t() - start });
+    }
+
+    if (!toolsSupported || finishReason !== "tool_calls" || Object.keys(toolCallAccumulator).length === 0) break;
+
+    const toolCalls = Object.entries(toolCallAccumulator).map(([index, tc]) => ({
+      id: `call_${index}`, type: "function" as const, function: { name: tc.name, arguments: tc.args },
+    }));
+
+    msgs.push({ role: "assistant", tool_calls: toolCalls, content: null });
+
+    const toolResults: OpenAI.Chat.ChatCompletionToolMessageParam[] = [];
+    for (const tc of toolCalls) {
+      let input: Record<string, string> = {};
+      try { input = JSON.parse(tc.function.arguments); } catch { /* skip */ }
+      const toolStart = t();
+      const { result, partialContext } = await executeTool(tc.function.name, input, chatId);
+      perf.push({ step: tc.function.name, ms: t() - toolStart });
+      if (partialContext.graph) context.graph.push(...partialContext.graph);
+      if (partialContext.history) context.history.push(...partialContext.history);
+      if (partialContext.recent) context.recent = true;
+      toolResults.push({ role: "tool", tool_call_id: tc.id, content: result });
+    }
+    msgs.push(...toolResults);
+  }
+
+  return fullResponse;
+}
 import { queryGraphMemory } from "@/lib/memory/graph";
 import { semanticSearch } from "@/lib/memory/semantic";
 import { getRecentMessages, getMessages, formatRecentMessages } from "@/lib/memory/recent";
@@ -69,7 +170,7 @@ async function executeTool(
 // POST /api/chats/:chatId/messages — send a message and stream Claude's response
 export async function POST(req: Request, { params }: { params: { chatId: string } }) {
   const { chatId } = params;
-  const { message: userText } = await req.json();
+  const { message: userText, model = "claude-sonnet-4-6" } = await req.json();
 
   const messageId = uuid();
   const userId = uuid();
@@ -100,13 +201,27 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
 
   const stream = new ReadableStream({
     async start(controller) {
+      const emit = (payload: object) =>
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+
+      const perf: { step: string; ms: number }[] = [];
+      const t = () => Date.now();
+
       try {
+        if (isOpenAIModel(model)) {
+          fullResponse = await runOpenAICompatibleStream(openai, model, initialContent, chatId, context, perf, emit, t);
+        } else if (isGroqModel(model)) {
+          fullResponse = await runOpenAICompatibleStream(groq, model, initialContent, chatId, context, perf, emit, t);
+        } else {
         // Streaming tool-use loop — streams immediately, detects tool calls mid-stream
         const msgs: Anthropic.MessageParam[] = [{ role: "user", content: initialContent }];
 
         for (let i = 0; i < 5; i++) {
+          const claudeStart = t();
+          let firstToken = true;
+
           const claudeStream = anthropic.messages.stream({
-            model: "claude-sonnet-4-6",
+            model,
             max_tokens: 4096,
             system: SYSTEM_PROMPT,
             tools: MEMORY_TOOLS,
@@ -115,17 +230,22 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
 
           for await (const chunk of claudeStream) {
             if (chunk.type === "content_block_start" && chunk.content_block.type === "tool_use") {
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ thinking: getThinkingLabel(chunk.content_block.name) })}\n\n`)
-              );
+              emit({ thinking: getThinkingLabel(chunk.content_block.name) });
             }
             if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+              if (firstToken) {
+                perf.push({ step: i === 0 ? "Time to first token" : "Time to first token (after tools)", ms: t() - claudeStart });
+                firstToken = false;
+              }
               fullResponse += chunk.delta.text;
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk.delta.text })}\n\n`));
+              emit({ text: chunk.delta.text });
             }
           }
 
           const finalMessage = await claudeStream.finalMessage();
+          if (firstToken) {
+            perf.push({ step: `Claude API call ${i + 1}`, ms: t() - claudeStart });
+          }
           if (finalMessage.stop_reason !== "tool_use") break;
 
           msgs.push({ role: "assistant", content: finalMessage.content });
@@ -133,11 +253,13 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
           const toolResults: Anthropic.ToolResultBlockParam[] = [];
           for (const block of finalMessage.content) {
             if (block.type !== "tool_use") continue;
+            const toolStart = t();
             const { result, partialContext } = await executeTool(
               block.name,
               block.input as Record<string, string>,
               chatId
             );
+            perf.push({ step: block.name, ms: t() - toolStart });
             if (partialContext.graph) context.graph.push(...partialContext.graph);
             if (partialContext.history) context.history.push(...partialContext.history);
             if (partialContext.recent) context.recent = true;
@@ -146,6 +268,7 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
 
           msgs.push({ role: "user", content: toolResults });
         }
+        } // end Anthropic path
 
         const now = new Date().toISOString();
         const userMessage: Message = { id: userId, role: "user", content: userText, timestamp: now };
@@ -154,10 +277,11 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
           role: "assistant",
           content: fullResponse,
           timestamp: now,
+          model,
         };
 
         await Promise.all([
-          appendMessage(chatId, userMessage, assistantMessage, context),
+          appendMessage(chatId, userMessage, assistantMessage, context, perf),
           processConversation(chatId, userText, fullResponse).catch(() => {}),
           indexExchange(chatId, userText, fullResponse, now).catch(() => {}),
         ]);
@@ -170,11 +294,7 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
           updateChatMeta(chatId, { updatedAt: now });
         }
 
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({ done: true, messageId, userMessageId: userId, context, title })}\n\n`
-          )
-        );
+        emit({ done: true, messageId, userMessageId: userId, context, title, perf });
       } catch (err) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: String(err) })}\n\n`));
       } finally {

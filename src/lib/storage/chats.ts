@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import type { Chat, Message, MessageContext } from "@/types";
+import type { Chat, Message, MessageContext, PerfEntry } from "@/types";
 
 const DATA_PATH = process.env.DATA_PATH || "./data";
 
@@ -49,7 +49,8 @@ export function appendMessage(
   chatId: string,
   userMessage: Message,
   assistantMessage: Message,
-  context: MessageContext
+  context: MessageContext,
+  perf?: PerfEntry[]
 ): void {
   const dir = chatDir(chatId);
   fs.mkdirSync(dir, { recursive: true });
@@ -68,6 +69,8 @@ ${attachmentLines}
 <!-- assistant-id: ${assistantMessage.id} -->
 **Claude:** ${assistantMessage.content}
 <!-- context: ${JSON.stringify(context)} -->
+${assistantMessage.model ? `<!-- model: ${assistantMessage.model} -->` : ""}
+${perf && perf.length > 0 ? `<!-- perf: ${JSON.stringify(perf)} -->` : ""}
 
 `;
   fs.appendFileSync(filePath, entry);
@@ -135,11 +138,17 @@ export function parseMessages(chatId: string): Message[] {
     }
 
     if (assistantContent) {
+      const perfMatch = block.match(/<!-- perf: (\[[\s\S]*?\]) -->/);
+      const modelMatch = block.match(/<!-- model: ([^\s]+) -->/);
+      let perf: PerfEntry[] | undefined;
+      try { if (perfMatch) perf = JSON.parse(perfMatch[1]); } catch { /* skip */ }
       messages.push({
         id: assistantId || `assistant-${timestamp}`,
         role: "assistant",
         content: assistantContent,
         timestamp,
+        perf,
+        model: modelMatch?.[1],
       });
     }
   }
