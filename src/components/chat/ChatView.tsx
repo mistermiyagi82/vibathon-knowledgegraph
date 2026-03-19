@@ -112,7 +112,7 @@ export default function ChatView({ chatId }: Props) {
     setNewMessageIds((prev) => [...prev, tempUserId]);
     setIsStreaming(true);
     setStreamingContent("");
-    scrollToBottom();
+    setTimeout(scrollToBottom, 50);
 
     if (file) {
       const form = new FormData();
@@ -221,6 +221,18 @@ export default function ChatView({ chatId }: Props) {
     );
   }
 
+  if (isStreaming && !streamingContent) {
+    messageElements.push(
+      <div key="thinking" className="mb-8 animate-fade-in">
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:0ms]" />
+          <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:150ms]" />
+          <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:300ms]" />
+        </div>
+      </div>
+    );
+  }
+
   if (isStreaming && streamingContent) {
     messageElements.push(
       <MessageBubble
@@ -234,7 +246,7 @@ export default function ChatView({ chatId }: Props) {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Top bar */}
-      <div className="shrink-0 flex items-center justify-between px-8 py-5">
+      <div className="shrink-0 flex items-center justify-between px-4 sm:px-8 py-4 sm:py-5">
         {/* Menu button */}
         <button
           onClick={() => setMenuOpen((o) => !o)}
@@ -255,16 +267,7 @@ export default function ChatView({ chatId }: Props) {
           aria-label="Memory"
           title="Memory"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M8 5a3 3 0 1 0 0 6A3 3 0 0 0 8 5zm0 1.2a1.8 1.8 0 1 1 0 3.6A1.8 1.8 0 0 1 8 6.2z"
-              fill="currentColor"
-            />
-            <path
-              d="M6.6 1.4l-.4 1.1a5 5 0 0 0-.9.5l-1.1-.3-1.4 2.4.8.8a5 5 0 0 0 0 1l-.8.8 1.4 2.4 1.1-.3c.3.2.6.4.9.5l.4 1.1h2.8l.4-1.1c.3-.1.6-.3.9-.5l1.1.3 1.4-2.4-.8-.8a5 5 0 0 0 0-1l.8-.8-1.4-2.4-1.1.3a5 5 0 0 0-.9-.5L9.4 1.4H6.6zm.6 1.2h1.6l.3.9.5.3c.2.1.5.3.7.4l.5.2.9-.2.8 1.4-.7.7.1.5c0 .2.1.4.1.6s0 .4-.1.6l-.1.5.7.7-.8 1.4-.9-.2-.5.2c-.2.1-.5.3-.7.4l-.5.3-.3.9H7.2l-.3-.9-.5-.3a4 4 0 0 1-.7-.4l-.5-.2-.9.2-.8-1.4.7-.7-.1-.5A3.5 3.5 0 0 1 4 8c0-.2 0-.4.1-.6l.1-.5-.7-.7.8-1.4.9.2.5-.2c.2-.1.5-.3.7-.4l.5-.3.3-.9z"
-              fill="currentColor"
-            />
-          </svg>
+          ⚙️
         </button>
       </div>
 
@@ -275,7 +278,7 @@ export default function ChatView({ chatId }: Props) {
           onClick={() => setMenuOpen(false)}
         >
           <div
-            className="absolute top-14 left-8 bg-background border border-ink/8 rounded-xl shadow-sm py-2 min-w-48"
+            className="absolute top-14 left-8 bg-background border border-ink/8 rounded-xl shadow-sm py-2 w-max max-w-xs"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -304,15 +307,21 @@ export default function ChatView({ chatId }: Props) {
       )}
 
       {/* Messages — scrollable, centered */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
-        <div className="max-w-2xl mx-auto px-6 pt-4 pb-6">
-          {messageElements}
+      <div className="flex-1 min-h-0 relative">
+        {/* Top fade */}
+        <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-background to-transparent z-10 pointer-events-none" />
+        {/* Bottom fade */}
+        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent z-10 pointer-events-none" />
+        <div ref={scrollRef} className="h-full overflow-y-auto">
+          <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-4 pb-6">
+            {messageElements}
+          </div>
         </div>
       </div>
 
       {/* Input — centered */}
-      <div className="shrink-0 pb-8 pt-2">
-        <div className="max-w-2xl mx-auto px-6">
+      <div className="shrink-0 pb-6 sm:pb-8 pt-2" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
+        <div className="max-w-2xl mx-auto px-4 sm:px-6">
           <MessageInput onSend={sendMessage} disabled={isStreaming} autoFocus />
         </div>
       </div>

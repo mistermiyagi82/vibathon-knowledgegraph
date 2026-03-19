@@ -25,14 +25,9 @@ export default function MemoryModal({ overview, memoryUpdated, onClose }: Props)
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 animate-fade-in"
-        onClick={onClose}
-      />
 
       {/* Drawer from right */}
-      <div className="fixed top-0 right-0 h-full w-80 z-50 bg-background shadow-xl animate-fade-in flex flex-col">
+      <div className="fixed top-0 right-0 h-full w-full sm:w-80 z-50 bg-background shadow-xl animate-fade-in flex flex-col">
         <div className="flex items-center justify-between px-6 py-5 border-b border-ink/6">
           <p className="text-xs text-muted uppercase tracking-widest font-light">Memory</p>
           <button

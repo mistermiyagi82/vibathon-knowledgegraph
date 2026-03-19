@@ -29,16 +29,11 @@ export default function ContextModal({ context, onClose }: Props) {
     context.files.length === 0;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/10 backdrop-blur-sm animate-fade-in"
-      onClick={onClose}
-    >
-      <div
-        className="bg-background rounded-2xl shadow-lg w-full max-w-md mx-6 p-8 animate-slide-up"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-6">
-          <p className="text-xs text-muted uppercase tracking-widest font-light">Based on</p>
+    <>
+      {/* Drawer from left */}
+      <div className="fixed top-0 left-0 h-full w-full sm:w-80 z-50 bg-background shadow-xl animate-fade-in flex flex-col">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-ink/6">
+          <p className="text-xs text-muted uppercase tracking-widest font-light">Sources</p>
           <button
             onClick={onClose}
             className="text-muted hover:text-ink transition-colors text-lg leading-none"
@@ -47,37 +42,31 @@ export default function ContextModal({ context, onClose }: Props) {
           </button>
         </div>
 
-        {isEmpty && (
-          <p className="text-sm text-muted">No memory sources for this response.</p>
-        )}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
+          {isEmpty && (
+            <p className="text-xs text-muted">No memory sources for this response.</p>
+          )}
 
-        <div className="space-y-5">
           {context.graph.map((f, i) => (
-            <div key={i} className={`pl-3 border-l-2 ${SOURCES[0].color}`}>
-              <p className="text-xs text-muted mb-0.5">{SOURCES[0].label}</p>
-              <p className="text-sm text-ink font-light leading-relaxed">
+            <div key={i} className={`pl-3 border-l-2 ${SOURCES[0].color} py-0.5`}>
+              <p className="text-[11px] text-ink/70 leading-relaxed">
                 {f.subject} {f.relationship.toLowerCase().replace(/_/g, " ")} {f.object}
               </p>
             </div>
           ))}
 
           {context.history.map((h, i) => (
-            <div key={i} className={`pl-3 border-l-2 ${SOURCES[1].color}`}>
-              <p className="text-xs text-muted mb-0.5">
-                {SOURCES[1].label} · {h.chatTitle} ·{" "}
-                {new Date(h.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-              </p>
-              <p className="text-sm text-ink font-light leading-relaxed line-clamp-4">{h.excerpt}</p>
+            <div key={i} className={`pl-3 border-l-2 ${SOURCES[1].color} py-0.5`}>
+              <p className="text-[11px] text-ink/70 leading-relaxed">{h.excerpt}</p>
             </div>
           ))}
 
           {context.files.map((f, i) => (
-            <div key={i} className={`pl-3 border-l-2 ${SOURCES[2].color}`}>
-              <p className="text-xs text-muted mb-0.5">{SOURCES[2].label}</p>
+            <div key={i} className={`pl-3 border-l-2 ${SOURCES[2].color} py-0.5`}>
               <a
                 href={`/api/files/${f.chatId}/${f.filename}`}
                 download
-                className="text-sm text-ink hover:underline"
+                className="text-[11px] text-ink/70 hover:text-ink transition-colors leading-relaxed block"
               >
                 {f.filename} ↓
               </a>
@@ -85,6 +74,6 @@ export default function ContextModal({ context, onClose }: Props) {
           ))}
         </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
 import type { Message } from "@/types";
 
 interface Props {
@@ -26,28 +27,22 @@ export default function MessageBubble({ message, streaming, onOpenContext, isNew
   const isAssistant = message.role === "assistant";
 
   if (isAssistant) {
+    const clickable = !streaming && !!onOpenContext;
     return (
-      <div className={`mb-8 ${isNew ? "animate-fade-in" : ""}`}>
-        <p className="text-sm leading-7 text-ink font-light whitespace-pre-wrap">
-          {message.content}
+      <div
+        className={`mb-8 ${isNew ? "animate-fade-in" : ""} ${clickable ? "cursor-pointer -mx-3 px-3 py-2 rounded-lg hover:bg-ink/5 transition-colors duration-150" : ""}`}
+        onClick={clickable ? () => onOpenContext!(message.id) : undefined}
+      >
+        <div className="text-sm leading-7 text-ink font-light prose-sm prose-neutral max-w-none [&_strong]:font-semibold [&_em]:italic [&_code]:bg-ink/8 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-ink/5 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5">
+          <ReactMarkdown>{message.content}</ReactMarkdown>
           {streaming && <span className="blink-cursor" />}
-        </p>
+        </div>
 
-        {/* Timestamp + source button — always visible, hidden while streaming */}
         {!streaming && (
-          <div className="flex items-center gap-3 mt-2">
+          <div className="mt-2">
             <span className="text-xs text-muted/60">
               {formatTimestamp(message.timestamp)}
             </span>
-            {onOpenContext && (
-              <button
-                onClick={() => onOpenContext(message.id)}
-                className="text-xs text-muted/50 hover:text-muted transition-colors"
-                title="View sources"
-              >
-                Sources
-              </button>
-            )}
           </div>
         )}
       </div>
@@ -57,7 +52,7 @@ export default function MessageBubble({ message, streaming, onOpenContext, isNew
   // User message — right-aligned white card
   return (
     <div className={`flex justify-end mb-8 ${isNew ? "animate-slide-up" : ""}`}>
-      <div className="max-w-[70%]">
+      <div className="max-w-[85%] sm:max-w-[70%]">
         <div className="bg-white rounded-2xl px-4 py-3 shadow-sm">
           <p className="text-sm leading-6 text-ink whitespace-pre-wrap">{message.content}</p>
           {message.attachments?.map((att) => (

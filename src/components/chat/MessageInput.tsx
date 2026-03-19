@@ -30,6 +30,7 @@ export default function MessageInput({ onSend, disabled, autoFocus }: Props) {
     setText("");
     setFile(undefined);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    inputRef.current?.focus();
   }
 
   return (
@@ -73,8 +74,7 @@ export default function MessageInput({ onSend, disabled, autoFocus }: Props) {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSubmit()}
           placeholder="Ask anything..."
-          disabled={disabled}
-          className="flex-1 bg-transparent text-sm text-ink font-normal outline-none placeholder:text-ink/30 caret-ink disabled:opacity-50"
+          className={`flex-1 bg-transparent text-sm text-ink font-normal outline-none placeholder:text-ink/30 caret-ink transition-opacity ${disabled ? "opacity-50" : ""}`}
           autoComplete="off"
           spellCheck={false}
         />

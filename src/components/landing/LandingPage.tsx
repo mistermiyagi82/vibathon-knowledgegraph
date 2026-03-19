@@ -44,11 +44,8 @@ export default function LandingPage() {
     setLoading(true);
 
     try {
-      // Create new chat
       const res = await fetch("/api/chats", { method: "POST" });
       const chat: Chat = await res.json();
-
-      // Navigate to the chat, passing the initial message via query
       router.push(`/chat/${chat.id}?first=${encodeURIComponent(input.trim())}`);
     } catch {
       setLoading(false);
@@ -56,16 +53,15 @@ export default function LandingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background flex flex-col items-center" style={{ minWidth: 1280 }}>
+    <main className="min-h-screen bg-background flex flex-col items-center">
+      <div className="w-full max-w-2xl px-6 sm:px-8 pt-[28vh]">
 
-      {/* Center content */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl px-8 -mt-16">
-        <h1 className="text-[2.4rem] font-normal text-ink mb-16 text-center leading-snug" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+        <h1 className="text-[1.8rem] sm:text-[2.4rem] font-normal text-ink mb-10 sm:mb-16 text-center leading-snug" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
           Hey, what are you up to today?
         </h1>
 
-        {/* Input — 80% width of the headline, centered */}
-        <form onSubmit={handleSubmit} className="w-4/5 flex items-center gap-3">
+        {/* Input */}
+        <form onSubmit={handleSubmit} className="w-full sm:w-4/5 mx-auto flex items-center gap-3">
           <input
             ref={inputRef}
             value={input}
@@ -87,17 +83,18 @@ export default function LandingPage() {
           </button>
         </form>
 
-        {/* Divider — same width as input */}
-        <div className="w-4/5 h-px bg-ink/10 mt-4 mb-8" />
+        {/* Divider */}
+        <div className="w-full sm:w-4/5 mx-auto h-px bg-ink/10 mt-4 mb-8" />
 
-        {/* Recent chats */}
+        {/* Recent chats — staggered fade-in */}
         {chats.length > 0 && (
-          <div className="w-full space-y-0 mt-5">
-            {chats.map((chat) => (
+          <div className="w-full space-y-0">
+            {chats.map((chat, i) => (
               <button
                 key={chat.id}
                 onClick={() => router.push(`/chat/${chat.id}`)}
-                className="w-full flex items-baseline justify-between py-3 px-3 -mx-3 rounded-lg group text-left hover:bg-ink/5 transition-colors duration-150"
+                className="w-full flex items-baseline justify-between py-3 px-3 -mx-3 rounded-lg text-left hover:bg-ink/5 transition-colors duration-150 animate-fade-in"
+                style={{ animationDelay: `${i * 60}ms`, animationFillMode: "both" }}
               >
                 <div className="flex-1 min-w-0 pr-6">
                   <span className="text-sm text-ink font-normal block truncate">
