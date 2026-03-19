@@ -4,7 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { anthropic, SYSTEM_PROMPT, MEMORY_TOOLS } from "@/lib/anthropic";
 import { queryGraphMemory } from "@/lib/memory/graph";
 import { semanticSearch } from "@/lib/memory/semantic";
-import { getRecentMessages, formatRecentMessages } from "@/lib/memory/recent";
+import { getRecentMessages, getMessages, formatRecentMessages } from "@/lib/memory/recent";
 import { appendMessage, updateChatMeta } from "@/lib/storage/chats";
 import { listChatFiles, readFileContents } from "@/lib/storage/files";
 import { processConversation } from "@/lib/memory/processor";
@@ -15,6 +15,7 @@ function getThinkingLabel(toolName: string): string {
     case "query_memory": return "Checking memory...";
     case "search_history": return "Looking through past conversations...";
     case "get_recent_messages": return "Reading recent messages...";
+    case "get_chat_history": return "Looking through conversation history...";
     default: return "Thinking...";
   }
 }
@@ -47,6 +48,15 @@ async function executeTool(
     return {
       result: formatRecentMessages(recent) || "No recent messages.",
       partialContext: { recent: recent.length > 0 },
+    };
+  }
+  if (name === "get_chat_history") {
+    const offset = typeof input.offset === "string" ? parseInt(input.offset) : (input.offset as unknown as number ?? 0);
+    const limit = typeof input.limit === "string" ? parseInt(input.limit) : (input.limit as unknown as number ?? 10);
+    const msgs = getMessages(chatId, offset, limit);
+    return {
+      result: formatRecentMessages(msgs) || "No messages found at that position.",
+      partialContext: {},
     };
   }
   return { result: "Unknown tool.", partialContext: {} };

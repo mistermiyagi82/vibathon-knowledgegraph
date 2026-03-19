@@ -71,4 +71,23 @@ export const MEMORY_TOOLS: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "get_chat_history",
+    description:
+      "Retrieve messages from any point in this conversation by position. Use offset=0 to get the very first messages ('what was the first thing I said?'). Use a positive offset to start from that message number. Use a negative offset to count from the end (e.g. offset=-5 gets messages starting 5 from the end).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        offset: {
+          type: "number",
+          description: "Where to start. 0 = first message, -5 = 5 from the end. Default: 0.",
+        },
+        limit: {
+          type: "number",
+          description: "How many messages to return. Default: 10.",
+        },
+      },
+      required: [],
+    },
+  },
 ];

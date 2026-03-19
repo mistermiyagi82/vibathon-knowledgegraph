@@ -7,6 +7,14 @@ export function getRecentMessages(chatId: string, limit = 10): Message[] {
   return messages.slice(-limit);
 }
 
+// Return messages from any position in the chat.
+// offset=0 starts from the beginning; negative offset counts from the end.
+export function getMessages(chatId: string, offset = 0, limit = 10): Message[] {
+  const messages = parseMessages(chatId);
+  const start = offset < 0 ? Math.max(0, messages.length + offset) : offset;
+  return messages.slice(start, start + limit);
+}
+
 // Format recent messages as a readable string for the prompt
 export function formatRecentMessages(messages: Message[]): string {
   if (messages.length === 0) return "";

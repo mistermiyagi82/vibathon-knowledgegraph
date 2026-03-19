@@ -358,6 +358,7 @@ export default function ChatView({ chatId }: Props) {
           overview={overview}
           memoryUpdated={memoryUpdated}
           onClose={() => setMemoryOpen(false)}
+          chatId={chatId}
         />
       )}
 
