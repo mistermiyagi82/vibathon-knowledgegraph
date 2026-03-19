@@ -56,7 +56,7 @@ export default function LandingPage() {
     <main className="min-h-screen bg-background flex flex-col items-center">
       <div className="w-full max-w-2xl px-6 sm:px-8 pt-[28vh]">
 
-        <h1 className="text-[2.7rem] sm:text-[3.6rem] font-normal text-ink mb-10 sm:mb-16 text-center leading-snug" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+        <h1 className="text-[2.16rem] sm:text-[2.88rem] font-normal text-ink mb-10 sm:mb-16 text-center leading-snug" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
           Hey, what are you up to today?
         </h1>
 
@@ -69,14 +69,14 @@ export default function LandingPage() {
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSubmit()}
             placeholder=""
             disabled={loading}
-            className="flex-1 bg-transparent text-ink text-[1.5rem] font-light outline-none placeholder:text-muted caret-ink"
+            className="flex-1 bg-transparent text-ink text-[1.2rem] font-light outline-none placeholder:text-muted caret-ink"
             autoComplete="off"
             spellCheck={false}
           />
           <button
             type="submit"
             disabled={!input.trim() || loading}
-            className="text-muted hover:text-ink transition-colors duration-150 disabled:opacity-0 text-[1.7rem] select-none"
+            className="text-muted hover:text-ink transition-colors duration-150 disabled:opacity-0 text-[1.35rem] select-none"
             aria-label="Send"
           >
             →
@@ -97,16 +97,16 @@ export default function LandingPage() {
                 style={{ animationDelay: `${i * 60}ms`, animationFillMode: "both" }}
               >
                 <div className="flex-1 min-w-0 pr-6">
-                  <span className="text-[1.3rem] text-ink font-normal block truncate">
+                  <span className="text-[1.05rem] text-ink font-normal block truncate">
                     {chat.title}
                   </span>
                   {chat.lastMessagePreview && (
-                    <span className="text-[1.1rem] text-muted block truncate mt-0.5">
+                    <span className="text-[0.9rem] text-muted block truncate mt-0.5">
                       {chat.lastMessagePreview}
                     </span>
                   )}
                 </div>
-                <span className="text-[1.1rem] text-muted shrink-0 tabular-nums">
+                <span className="text-[0.9rem] text-muted shrink-0 tabular-nums">
                   {formatRelativeTime(chat.updatedAt)}
                 </span>
               </button>
