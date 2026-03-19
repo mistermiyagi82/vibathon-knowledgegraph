@@ -4,8 +4,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { anthropic, SYSTEM_PROMPT, MEMORY_TOOLS } from "@/lib/anthropic";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const groq = new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" });
+function getOpenAIClient() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? "" });
+}
+function getGroqClient() {
+  return new OpenAI({ apiKey: process.env.GROQ_API_KEY ?? "", baseURL: "https://api.groq.com/openai/v1" });
+}
 
 const GROQ_MODELS = new Set(["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "meta-llama/llama-4-scout-17b-16e-instruct", "qwen/qwen3-32b", "moonshotai/kimi-k2-instruct", "groq/compound", "groq/compound-mini"]);
 const isOpenAIModel = (m: string) => m.startsWith("gpt-") || m.startsWith("o1") || m.startsWith("o3") || m.startsWith("o4");
@@ -209,9 +213,9 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
 
       try {
         if (isOpenAIModel(model)) {
-          fullResponse = await runOpenAICompatibleStream(openai, model, initialContent, chatId, context, perf, emit, t);
+          fullResponse = await runOpenAICompatibleStream(getOpenAIClient(), model, initialContent, chatId, context, perf, emit, t);
         } else if (isGroqModel(model)) {
-          fullResponse = await runOpenAICompatibleStream(groq, model, initialContent, chatId, context, perf, emit, t);
+          fullResponse = await runOpenAICompatibleStream(getGroqClient(), model, initialContent, chatId, context, perf, emit, t);
         } else {
         // Streaming tool-use loop — streams immediately, detects tool calls mid-stream
         const msgs: Anthropic.MessageParam[] = [{ role: "user", content: initialContent }];
