@@ -57,16 +57,10 @@ export default function LandingPage() {
 
   return (
     <main className="min-h-screen bg-background flex flex-col items-center" style={{ minWidth: 1280 }}>
-      {/* Wordmark */}
-      <div className="w-full max-w-2xl px-8 pt-12 pb-0">
-        <span className="text-xs font-light tracking-widest text-muted uppercase select-none">
-          mem
-        </span>
-      </div>
 
       {/* Center content */}
       <div className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl px-8 -mt-16">
-        <h1 className="text-3xl font-normal text-ink mb-10 text-center leading-snug">
+        <h1 className="text-3xl font-normal text-ink mb-10 text-center leading-snug" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
           Hey, what are you up to today?
         </h1>
 
