@@ -333,7 +333,10 @@ export default function ChatView({ chatId }: Props) {
           aria-label="Memory"
           title="Memory"
         >
-          ⚙️
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5C10.5 5 9 5.8 8.2 7.1C7.1 6.7 5.7 7 4.9 8C4.1 9 4.1 10.4 4.8 11.4C4 12 3.7 13.1 4.1 14.1C4.5 15.1 5.5 15.7 6.5 15.7C6.7 16.9 7.7 17.8 9 18C9.6 18.6 10.5 19 11.5 19H12.5C13.5 19 14.4 18.6 15 18C16.3 17.8 17.3 16.9 17.5 15.7C18.5 15.7 19.5 15.1 19.9 14.1C20.3 13.1 20 12 19.2 11.4C19.9 10.4 19.9 9 19.1 8C18.3 7 16.9 6.7 15.8 7.1C15 5.8 13.5 5 12 5Z"/>
+              <path d="M12 5V7M8.5 8.5L10 10M15.5 8.5L14 10M6.5 13H8M16 13H17.5M9 17L10 15M15 17L14 15"/>
+            </svg>
         </button>
       </div>
       </div>
