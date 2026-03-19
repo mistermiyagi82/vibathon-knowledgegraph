@@ -14,9 +14,15 @@ export default function MessageInput({ onSend, disabled, autoFocus }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Focus on mount
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus();
   }, [autoFocus]);
+
+  // Refocus after send completes (disabled flips false)
+  useEffect(() => {
+    if (!disabled) inputRef.current?.focus();
+  }, [disabled]);
 
   function handleSubmit() {
     if ((!text.trim() && !file) || disabled) return;
