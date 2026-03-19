@@ -52,6 +52,7 @@ export default function ChatView({ chatId }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentFirstRef = useRef(false);
   const isStreamingRef = useRef(false);
+  const initialMsgIdsRef = useRef<Set<string> | null>(null);
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -94,7 +95,11 @@ export default function ChatView({ chatId }: Props) {
       const data = await res.json();
       // Don't overwrite temp messages if a stream is already in flight
       if (!isStreamingRef.current) {
-        setMessages(data.messages || []);
+        const msgs = data.messages || [];
+        if (!initialMsgIdsRef.current) {
+          initialMsgIdsRef.current = new Set(msgs.map((m: { id: string }) => m.id));
+        }
+        setMessages(msgs);
         setTimeout(scrollToBottom, 50);
       }
     } catch {}
@@ -252,20 +257,33 @@ export default function ChatView({ chatId }: Props) {
   // Build message list with date separators
   const messageElements: React.ReactNode[] = [];
   let lastDate = "";
-  for (const msg of messages) {
+  const total = messages.length;
+  const maxStagger = 8; // only animate bottom N messages
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    const isInitial = initialMsgIdsRef.current?.has(msg.id) ?? false;
+    const reverseIndex = total - 1 - i; // 0 = bottom message
+    const shouldAnimate = isInitial && reverseIndex < maxStagger;
+    const delay = shouldAnimate ? 120 + reverseIndex * 40 : 0;
+
     const dateKey = msg.timestamp.slice(0, 10);
     if (dateKey && dateKey !== lastDate) {
       messageElements.push(<DateSeparator key={`sep-${dateKey}`} date={msg.timestamp} />);
       lastDate = dateKey;
     }
     messageElements.push(
-      <MessageBubble
+      <div
         key={msg.id}
-        message={msg}
-        onOpenContext={msg.role === "assistant" ? handleOpenContext : undefined}
-        isActive={msg.id === activeMessageId}
-        isNew={newMessageIds.includes(msg.id)}
-      />
+        className={shouldAnimate ? "animate-slide-up" : ""}
+        style={shouldAnimate ? { animationDelay: `${delay}ms`, opacity: 0, animationFillMode: "both" } : undefined}
+      >
+        <MessageBubble
+          message={msg}
+          onOpenContext={msg.role === "assistant" ? handleOpenContext : undefined}
+          isActive={msg.id === activeMessageId}
+          isNew={newMessageIds.includes(msg.id)}
+        />
+      </div>
     );
   }
 
@@ -300,7 +318,7 @@ export default function ChatView({ chatId }: Props) {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Top bar */}
-      <div className="shrink-0 py-4 sm:py-5">
+      <div className="shrink-0 py-4 sm:py-5 animate-fade-in" style={{ animationDelay: '0ms', animationDuration: '200ms' }}>
       <div className="max-w-2xl mx-auto px-4 sm:px-6 flex items-center justify-between">
         <div className="flex items-center gap-1">
           {/* Menu button — relative so dropdown anchors to it */}
@@ -387,7 +405,7 @@ export default function ChatView({ chatId }: Props) {
 
 
       {/* Messages — scrollable, centered */}
-      <div className="flex-1 min-h-0 relative">
+      <div className="flex-1 min-h-0 relative animate-fade-in" style={{ animationDelay: '80ms', animationDuration: '300ms', opacity: 0, animationFillMode: 'both' }}>
         {/* Top fade */}
         <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-background to-transparent z-10 pointer-events-none" />
         {/* Bottom fade */}
