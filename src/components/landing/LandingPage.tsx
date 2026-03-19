@@ -60,7 +60,7 @@ export default function LandingPage() {
 
       {/* Center content */}
       <div className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl px-8 -mt-16">
-        <h1 className="text-3xl font-normal text-ink mb-10 text-center leading-snug" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+        <h1 className="text-[2.4rem] font-normal text-ink mb-16 text-center leading-snug" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
           Hey, what are you up to today?
         </h1>
 
@@ -87,12 +87,12 @@ export default function LandingPage() {
           </button>
         </form>
 
-        {/* Divider */}
-        <div className="w-full h-px bg-ink/10 mt-4 mb-8" />
+        {/* Divider — same width as input */}
+        <div className="w-4/5 h-px bg-ink/10 mt-4 mb-8" />
 
         {/* Recent chats */}
         {chats.length > 0 && (
-          <div className="w-full space-y-0">
+          <div className="w-full space-y-0 mt-5">
             {chats.map((chat) => (
               <button
                 key={chat.id}
