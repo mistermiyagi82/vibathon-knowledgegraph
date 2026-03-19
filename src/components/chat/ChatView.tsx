@@ -53,6 +53,7 @@ export default function ChatView({ chatId }: Props) {
     const first = searchParams.get("first");
     if (first && !sentFirstRef.current && messages.length === 0) {
       sentFirstRef.current = true;
+      router.replace(`/chat/${chatId}`);
       setTimeout(() => sendMessage(first), 100);
     }
   }, [messages.length]);
