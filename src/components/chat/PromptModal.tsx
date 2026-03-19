@@ -39,7 +39,7 @@ export default function PromptModal({ onClose }: Props) {
       <div className="relative bg-background rounded-2xl shadow-lg w-full max-w-2xl mx-4 flex flex-col max-h-[80vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-ink/8">
-          <span className="text-sm font-medium text-ink">System Prompt</span>
+          <span className="text-sm font-medium text-ink flex items-center gap-1.5">✏️ System Prompt</span>
           <button onClick={onClose} className="text-ink/40 hover:text-ink transition-colors text-lg leading-none">×</button>
         </div>
 

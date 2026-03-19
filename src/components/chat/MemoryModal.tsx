@@ -53,7 +53,7 @@ export default function MemoryModal({ overview, memoryUpdated, onClose, chatId }
       {/* Drawer from right */}
       <div className="fixed top-0 right-0 h-full w-full sm:w-80 z-50 bg-background shadow-xl animate-fade-in flex flex-col">
         <div className="flex items-center justify-between px-6 py-5 border-b border-ink/6">
-          <p className="text-xs text-muted uppercase tracking-widest font-light">Memory</p>
+          <p className="text-xs text-muted uppercase tracking-widest font-light flex items-center gap-1.5">🧠 Memory</p>
           <div className="flex items-center gap-2">
             <InfoTooltip text="This is everything the assistant remembers about you across all conversations — facts it has learned, files you've shared, and your session history." />
             <button
