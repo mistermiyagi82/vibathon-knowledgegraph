@@ -298,7 +298,8 @@ export default function ChatView({ chatId }: Props) {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Top bar */}
-      <div className="shrink-0 flex items-center justify-between px-4 sm:px-8 py-4 sm:py-5">
+      <div className="shrink-0 py-4 sm:py-5">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 flex items-center justify-between">
         {/* Menu button */}
         <button
           onClick={() => setMenuOpen((o) => !o)}
@@ -321,6 +322,7 @@ export default function ChatView({ chatId }: Props) {
         >
           ⚙️
         </button>
+      </div>
       </div>
 
       {/* Menu overlay */}
