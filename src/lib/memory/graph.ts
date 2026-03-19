@@ -1,5 +1,29 @@
-import { runQuery } from "@/lib/neo4j";
+import Database from "better-sqlite3";
+import path from "path";
+import fs from "fs";
 import type { GraphFact } from "@/types";
+
+const DATA_PATH = process.env.DATA_PATH || "./data";
+const DB_PATH = path.join(DATA_PATH, "embeddings.db");
+
+let _db: Database.Database | null = null;
+
+function getDb(): Database.Database {
+  if (_db) return _db;
+  fs.mkdirSync(DATA_PATH, { recursive: true });
+  _db = new Database(DB_PATH);
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS facts (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      subject      TEXT NOT NULL,
+      relationship TEXT NOT NULL,
+      object       TEXT NOT NULL,
+      created_at   TEXT NOT NULL,
+      UNIQUE(subject, relationship, object)
+    )
+  `);
+  return _db;
+}
 
 const STOP_WORDS = new Set([
   "what", "when", "where", "which", "who", "how", "that", "this", "these",
@@ -19,55 +43,49 @@ function extractKeywords(message: string): string[] {
     .slice(0, 6);
 }
 
-// Query the knowledge graph for facts relevant to the current message
 export async function queryGraphMemory(userMessage: string): Promise<GraphFact[]> {
-  if (!process.env.NEO4J_URI) return [];
-
-  const keywords = extractKeywords(userMessage);
-
   try {
-    // If we have keywords, do a targeted search first
+    const db = getDb();
+    const keywords = extractKeywords(userMessage);
+
     if (keywords.length > 0) {
-      const targeted = await runQuery<{ subject: string; relationship: string; object: string }>(
-        `MATCH (a)-[r]->(b)
-         WHERE any(kw IN $keywords WHERE
-           toLower(a.name) CONTAINS kw OR toLower(b.name) CONTAINS kw)
-         RETURN a.name AS subject, type(r) AS relationship, b.name AS object
-         LIMIT 20`,
-        { keywords }
-      );
-      if (targeted.length > 0) return targeted;
+      const conditions = keywords.map(() =>
+        `(LOWER(subject) LIKE ? OR LOWER(relationship) LIKE ? OR LOWER(object) LIKE ?)`
+      ).join(" OR ");
+      const params = keywords.flatMap((kw) => [`%${kw}%`, `%${kw}%`, `%${kw}%`]);
+      const rows = db.prepare(
+        `SELECT subject, relationship, object FROM facts WHERE ${conditions} ORDER BY id DESC LIMIT 20`
+      ).all(...params) as GraphFact[];
+      if (rows.length > 0) return rows;
     }
 
-    // Fallback: return most recent facts (all, sorted by id descending if available)
-    return await runQuery<{ subject: string; relationship: string; object: string }>(
-      `MATCH (a)-[r]->(b)
-       RETURN a.name AS subject, type(r) AS relationship, b.name AS object
-       LIMIT 20`
-    );
+    // Fallback: return most recent facts
+    return db.prepare(
+      `SELECT subject, relationship, object FROM facts ORDER BY id DESC LIMIT 30`
+    ).all() as GraphFact[];
   } catch {
     return [];
   }
 }
 
-// Write entities extracted from an exchange to Neo4j
 export async function writeEntities(
   entities: Array<{ subject: string; relationship: string; object: string }>
 ): Promise<void> {
-  if (!process.env.NEO4J_URI || entities.length === 0) return;
-
+  if (entities.length === 0) return;
   try {
-    for (const { subject, relationship, object } of entities) {
-      // Sanitize relationship to be a valid Neo4j relationship type
-      const rel = relationship.replace(/[^A-Z0-9_]/gi, "_").toUpperCase();
-      await runQuery(
-        `MERGE (a:Entity {name: $subject})
-         MERGE (b:Entity {name: $object})
-         MERGE (a)-[:${rel}]->(b)`,
-        { subject, object }
-      );
-    }
+    const db = getDb();
+    const insert = db.prepare(
+      `INSERT OR IGNORE INTO facts (subject, relationship, object, created_at)
+       VALUES (?, ?, ?, ?)`
+    );
+    const now = new Date().toISOString();
+    const insertMany = db.transaction((items: typeof entities) => {
+      for (const { subject, relationship, object } of items) {
+        insert.run(subject, relationship.toUpperCase().replace(/[^A-Z0-9_]/g, "_"), object, now);
+      }
+    });
+    insertMany(entities);
   } catch {
-    // Silently fail — graph is not critical to chat functionality
+    // Silently fail — graph is not critical
   }
 }
