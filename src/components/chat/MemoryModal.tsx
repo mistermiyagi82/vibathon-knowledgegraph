@@ -44,22 +44,25 @@ export default function MemoryModal({ overview, memoryUpdated, onClose }: Props)
 
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
           {!overview || (overview.facts.length === 0 && overview.files.length === 0 && overview.stats.totalChats === 0) ? (
-            <p className="text-sm text-muted">No memory yet.</p>
+            <p className="text-xs text-muted">No memory yet.</p>
           ) : (
             <>
               {overview.facts.length > 0 && (
                 <section>
                   <p className="text-xs text-muted uppercase tracking-widest mb-3">What I know</p>
-                  <div className="flex flex-wrap gap-2">
-                    {overview.facts.slice(0, 8).map((f, i) => (
-                      <span
-                        key={i}
-                        className="text-xs text-ink/70 px-2.5 py-1 rounded-full border border-ink/10"
-                      >
-                        {f.object || f.subject}
-                      </span>
+                  <ul className="space-y-1.5">
+                    {overview.facts.slice(0, 12).map((f, i) => (
+                      <li key={i} className="text-xs text-ink/70">
+                        {f.subject !== "user" && f.subject !== "User"
+                          ? `${f.subject} `
+                          : ""}
+                        <span className="text-ink/40 text-xs">
+                          {f.relationship.toLowerCase().replace(/_/g, " ")}
+                        </span>{" "}
+                        {f.object}
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 </section>
               )}
 
@@ -72,7 +75,7 @@ export default function MemoryModal({ overview, memoryUpdated, onClose }: Props)
                         <a
                           href={`/api/files/${f.chatId}/${f.filename}`}
                           download
-                          className="text-sm text-ink/80 hover:text-ink transition-colors"
+                          className="text-xs text-ink/80 hover:text-ink transition-colors"
                         >
                           {f.filename}
                         </a>

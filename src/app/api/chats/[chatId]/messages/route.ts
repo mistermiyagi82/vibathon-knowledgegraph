@@ -1,12 +1,56 @@
 import { NextResponse } from "next/server";
 import { v4 as uuid } from "uuid";
-import { anthropic, SYSTEM_PROMPT, buildPrompt } from "@/lib/anthropic";
-import { queryGraphMemory, writeEntities } from "@/lib/memory/graph";
+import Anthropic from "@anthropic-ai/sdk";
+import { anthropic, SYSTEM_PROMPT, MEMORY_TOOLS } from "@/lib/anthropic";
+import { queryGraphMemory } from "@/lib/memory/graph";
 import { semanticSearch } from "@/lib/memory/semantic";
 import { getRecentMessages, formatRecentMessages } from "@/lib/memory/recent";
-import { appendMessage, updateChatMeta, listChats } from "@/lib/storage/chats";
-import { extractEntities } from "@/lib/entities/extractor";
+import { appendMessage, updateChatMeta } from "@/lib/storage/chats";
+import { listChatFiles, readFileContents } from "@/lib/storage/files";
+import { processConversation } from "@/lib/memory/processor";
 import type { Message, MessageContext } from "@/types";
+
+function getThinkingLabel(toolName: string): string {
+  switch (toolName) {
+    case "query_memory": return "Checking memory...";
+    case "search_history": return "Looking through past conversations...";
+    case "get_recent_messages": return "Reading recent messages...";
+    default: return "Thinking...";
+  }
+}
+
+async function executeTool(
+  name: string,
+  input: Record<string, string>,
+  chatId: string
+): Promise<{ result: string; partialContext: Partial<MessageContext> }> {
+  if (name === "query_memory") {
+    const facts = await queryGraphMemory(input.question ?? "");
+    return {
+      result:
+        facts.map((f) => `${f.subject} -[${f.relationship}]-> ${f.object}`).join("\n") ||
+        "No relevant facts found.",
+      partialContext: { graph: facts },
+    };
+  }
+  if (name === "search_history") {
+    const excerpts = await semanticSearch(input.query ?? "", chatId);
+    return {
+      result:
+        excerpts.map((e) => `[${e.chatTitle}] ${e.excerpt}`).join("\n\n") ||
+        "No relevant history found.",
+      partialContext: { history: excerpts },
+    };
+  }
+  if (name === "get_recent_messages") {
+    const recent = getRecentMessages(chatId, 10);
+    return {
+      result: formatRecentMessages(recent) || "No recent messages.",
+      partialContext: { recent: recent.length > 0 },
+    };
+  }
+  return { result: "Unknown tool.", partialContext: {} };
+}
 
 // POST /api/chats/:chatId/messages — send a message and stream Claude's response
 export async function POST(req: Request, { params }: { params: { chatId: string } }) {
@@ -16,60 +60,81 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
   const messageId = uuid();
   const userId = uuid();
 
-  // Handle /memory command
   if (userText.trim().toLowerCase() === "/memory") {
     return handleMemoryCommand(chatId, messageId, userId);
   }
 
-  // Build memory context
-  const recentMsgs = getRecentMessages(chatId, 10);
-  const [graphFacts, historyExcerpts] = await Promise.all([
-    queryGraphMemory(userText),
-    semanticSearch(userText, chatId),
-  ]);
-
-  const context: MessageContext = {
-    graph: graphFacts,
-    history: historyExcerpts,
-    files: [],
-    recent: recentMsgs.length > 0,
-  };
-
-  const prompt = buildPrompt({
-    graphFacts: graphFacts.map((f) => `${f.subject} -[${f.relationship}]-> ${f.object}`).join("\n"),
-    historyExcerpts: historyExcerpts.map((h) => `[${h.chatTitle}] ${h.excerpt}`).join("\n\n"),
-    recentMessages: formatRecentMessages(recentMsgs),
-    userMessage: userText,
-  });
-
+  const isFirstMessage = getRecentMessages(chatId, 1).length === 0;
   const encoder = new TextEncoder();
   let fullResponse = "";
-  const isFirstMessage = recentMsgs.length === 0;
+
+  // Read uploaded files for this chat and inject contents
+  const chatFiles = listChatFiles(chatId);
+  const fileBlocks = chatFiles
+    .map((f) => {
+      const contents = readFileContents(chatId, f.filename);
+      return contents ? `File: ${f.filename}\n\`\`\`\n${contents}\n\`\`\`` : null;
+    })
+    .filter((b): b is string => b !== null);
+
+  const initialContent =
+    fileBlocks.length > 0
+      ? `${userText}\n\n[Files in this conversation]\n${fileBlocks.join("\n\n")}`
+      : userText;
+
+  const context: MessageContext = { graph: [], history: [], files: chatFiles, recent: false };
 
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const claudeStream = anthropic.messages.stream({
-          model: "claude-sonnet-4-6",
-          max_tokens: 4096,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: prompt }],
-        });
+        // Streaming tool-use loop — streams immediately, detects tool calls mid-stream
+        const msgs: Anthropic.MessageParam[] = [{ role: "user", content: initialContent }];
 
-        for await (const chunk of claudeStream) {
-          if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
-            fullResponse += chunk.delta.text;
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk.delta.text })}\n\n`));
+        for (let i = 0; i < 5; i++) {
+          const claudeStream = anthropic.messages.stream({
+            model: "claude-sonnet-4-6",
+            max_tokens: 4096,
+            system: SYSTEM_PROMPT,
+            tools: MEMORY_TOOLS,
+            messages: msgs,
+          });
+
+          for await (const chunk of claudeStream) {
+            if (chunk.type === "content_block_start" && chunk.content_block.type === "tool_use") {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ thinking: getThinkingLabel(chunk.content_block.name) })}\n\n`)
+              );
+            }
+            if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+              fullResponse += chunk.delta.text;
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk.delta.text })}\n\n`));
+            }
           }
+
+          const finalMessage = await claudeStream.finalMessage();
+          if (finalMessage.stop_reason !== "tool_use") break;
+
+          msgs.push({ role: "assistant", content: finalMessage.content });
+
+          const toolResults: Anthropic.ToolResultBlockParam[] = [];
+          for (const block of finalMessage.content) {
+            if (block.type !== "tool_use") continue;
+            const { result, partialContext } = await executeTool(
+              block.name,
+              block.input as Record<string, string>,
+              chatId
+            );
+            if (partialContext.graph) context.graph.push(...partialContext.graph);
+            if (partialContext.history) context.history.push(...partialContext.history);
+            if (partialContext.recent) context.recent = true;
+            toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
+          }
+
+          msgs.push({ role: "user", content: toolResults });
         }
 
         const now = new Date().toISOString();
-        const userMessage: Message = {
-          id: userId,
-          role: "user",
-          content: userText,
-          timestamp: now,
-        };
+        const userMessage: Message = { id: userId, role: "user", content: userText, timestamp: now };
         const assistantMessage: Message = {
           id: messageId,
           role: "assistant",
@@ -77,13 +142,11 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
           timestamp: now,
         };
 
-        // Persist + extract entities in parallel
         await Promise.all([
           appendMessage(chatId, userMessage, assistantMessage, context),
-          extractEntities(userText, fullResponse).then(writeEntities).catch(() => {}),
+          processConversation(chatId, userText, fullResponse).catch(() => {}),
         ]);
 
-        // Generate title after first message
         let title: string | undefined;
         if (isFirstMessage) {
           title = await generateTitle(userText);
@@ -98,9 +161,7 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
           )
         );
       } catch (err) {
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ error: String(err) })}\n\n`)
-        );
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: String(err) })}\n\n`));
       } finally {
         controller.close();
       }
@@ -139,9 +200,10 @@ async function handleMemoryCommand(chatId: string, messageId: string, userId: st
   const encoder = new TextEncoder();
   let fullResponse = "";
 
-  const [graphFacts] = await Promise.all([queryGraphMemory("")]);
-
-  const graphSummary = graphFacts.map((f) => `${f.subject} -[${f.relationship}]-> ${f.object}`).join("\n");
+  const graphFacts = await queryGraphMemory("");
+  const graphSummary = graphFacts
+    .map((f) => `${f.subject} -[${f.relationship}]-> ${f.object}`)
+    .join("\n");
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -167,14 +229,21 @@ async function handleMemoryCommand(chatId: string, messageId: string, userId: st
 
         const now = new Date().toISOString();
         const userMessage: Message = { id: userId, role: "user", content: "/memory", timestamp: now };
-        const assistantMessage: Message = { id: messageId, role: "assistant", content: fullResponse, timestamp: now };
+        const assistantMessage: Message = {
+          id: messageId,
+          role: "assistant",
+          content: fullResponse,
+          timestamp: now,
+        };
         const context: MessageContext = { graph: graphFacts, history: [], files: [], recent: false };
 
         await appendMessage(chatId, userMessage, assistantMessage, context);
         updateChatMeta(chatId, { updatedAt: now });
 
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ done: true, messageId, userMessageId: userId, context })}\n\n`)
+          encoder.encode(
+            `data: ${JSON.stringify({ done: true, messageId, userMessageId: userId, context })}\n\n`
+          )
         );
       } catch (err) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: String(err) })}\n\n`));

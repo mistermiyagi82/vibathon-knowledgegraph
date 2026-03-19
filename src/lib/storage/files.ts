@@ -20,6 +20,39 @@ export function getFilePath(chatId: string, filename: string): string {
   return path.join(DATA_PATH, "uploads", chatId, filename);
 }
 
+export function listChatFiles(chatId: string): FileAttachment[] {
+  const uploadsDir = path.join(DATA_PATH, "uploads", chatId);
+  if (!fs.existsSync(uploadsDir)) return [];
+
+  return fs.readdirSync(uploadsDir).map((filename) => ({
+    filename,
+    type: path.extname(filename).slice(1),
+    path: `/api/files/${chatId}/${filename}`,
+    chatId,
+  }));
+}
+
+const TEXT_EXTENSIONS = new Set([
+  ".txt", ".md", ".csv", ".json", ".ts", ".js", ".tsx", ".jsx",
+  ".py", ".html", ".css", ".xml", ".yaml", ".yml", ".sh", ".sql",
+]);
+
+export function readFileContents(chatId: string, filename: string, maxBytes = 40000): string | null {
+  const ext = path.extname(filename).toLowerCase();
+  if (!TEXT_EXTENSIONS.has(ext)) return null;
+
+  const filePath = path.join(DATA_PATH, "uploads", chatId, filename);
+  if (!fs.existsSync(filePath)) return null;
+
+  try {
+    const buffer = fs.readFileSync(filePath);
+    const text = buffer.subarray(0, maxBytes).toString("utf-8");
+    return buffer.length > maxBytes ? text + "\n[truncated]" : text;
+  } catch {
+    return null;
+  }
+}
+
 export function listAllFiles(): FileAttachment[] {
   const uploadsDir = path.join(DATA_PATH, "uploads");
   if (!fs.existsSync(uploadsDir)) return [];

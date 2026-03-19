@@ -20,6 +20,7 @@ export default function ChatView({ chatId }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingContent, setStreamingContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [thinkingLabel, setThinkingLabel] = useState("");
   const [newMessageIds, setNewMessageIds] = useState<string[]>([]);
 
   const [memoryOpen, setMemoryOpen] = useState(false);
@@ -116,6 +117,7 @@ export default function ChatView({ chatId }: Props) {
     setNewMessageIds((prev) => [...prev, tempUserId]);
     setIsStreaming(true);
     setStreamingContent("");
+    setThinkingLabel("");
     setTimeout(scrollToBottom, 50);
 
     if (file) {
@@ -151,7 +153,12 @@ export default function ChatView({ chatId }: Props) {
           try {
             const payload = JSON.parse(line.slice(6));
 
+            if (payload.thinking) {
+              setThinkingLabel(payload.thinking);
+            }
+
             if (payload.text) {
+              setThinkingLabel("");
               accumulated += payload.text;
               setStreamingContent(accumulated);
               scrollToBottom();
@@ -180,6 +187,7 @@ export default function ChatView({ chatId }: Props) {
               ]);
               setNewMessageIds((prev) => [...prev, finalAssistantMsg.id]);
               setStreamingContent("");
+              setThinkingLabel("");
               setIsStreaming(false);
 
               if (payload.title) loadRecentChats();
@@ -237,10 +245,15 @@ export default function ChatView({ chatId }: Props) {
   if (isStreaming && !streamingContent) {
     messageElements.push(
       <div key="thinking" className="mb-8 animate-fade-in">
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:0ms]" />
-          <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:150ms]" />
-          <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:300ms]" />
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:0ms]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:150ms]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:300ms]" />
+          </div>
+          {thinkingLabel && (
+            <span className="text-xs text-ink/40 animate-fade-in">{thinkingLabel}</span>
+          )}
         </div>
       </div>
     );

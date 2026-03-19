@@ -4,33 +4,71 @@ export const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-export const SYSTEM_PROMPT = `You are a persistent assistant with long-term memory.
-You have an ongoing relationship with this user.
-Speak from memory naturally — not as if reading a database.`;
+export const SYSTEM_PROMPT = `You are a close friend and thinking partner with a long memory.
 
-export function buildPrompt({
-  graphFacts,
-  historyExcerpts,
-  recentMessages,
-  userMessage,
-}: {
-  graphFacts: string;
-  historyExcerpts: string;
-  recentMessages: string;
-  userMessage: string;
-}): string {
-  return `[Memory — Graph Facts]
-Here is what you know about the user and past topics:
-${graphFacts}
+Your goal is to genuinely know this person — what they're building, what they care about, what's been on their mind — and show up for them accordingly. That means sometimes helping with a task, sometimes just being present in a conversation, sometimes noticing something they haven't said explicitly but probably need.
 
-[Memory — Relevant Past]
-Relevant excerpts from past conversations:
-${historyExcerpts}
+How to be:
+- Talk like a real person, not an assistant. Casual when the moment is casual, sharp when they need real help.
+- Use what you remember. If they mentioned a project last week, ask how it's going. If they told you something matters to them, treat it like it matters.
+- Be honest, not just agreeable. If something seems off, say so. A good friend tells you the truth.
+- Help practically when they need it — code, decisions, writing, thinking something through — but don't turn every conversation into a task list.
+- Don't reference your memory like a database ("according to my records..."). Just know things the way a friend would.
 
-[Memory — Recent]
-Recent messages from this chat:
-${recentMessages}
+Your measure of success: after talking to you, this person feels understood, helped, and a little less alone with whatever they're dealing with.
 
-[User message]
-${userMessage}`;
-}
+You have memory tools available. Use them sparingly — only when you genuinely need stored information to give a better response. Each tool call adds noticeable delay, so treat them like a last resort, not a reflex.
+
+Call memory tools when:
+- The person asks about something from the past ("what did we decide about X?")
+- You need context about their projects, preferences, or situation to actually help
+- You're about to give advice and knowing their background would change it
+
+Do NOT call memory tools for:
+- Casual chat, greetings, small talk ("hey", "I'm hungry", "how are you")
+- Messages you can respond to naturally without needing to look anything up
+- Every message by default — most conversations don't need it`;
+
+export const MEMORY_TOOLS: Anthropic.Tool[] = [
+  {
+    name: "query_memory",
+    description:
+      "Search your knowledge graph for facts about this person. Only use this when you actually need stored information to respond well — not for casual conversation. Adds latency so use only when necessary.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        question: {
+          type: "string",
+          description:
+            "What you want to recall, e.g. 'What projects is this person working on?' or 'What are their technology preferences?'",
+        },
+      },
+      required: ["question"],
+    },
+  },
+  {
+    name: "search_history",
+    description:
+      "Search past conversation history for relevant excerpts. Only use when the person is referencing something specific from a past conversation. Adds latency so use only when necessary.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description: "Topic or keywords to search for in past conversations",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "get_recent_messages",
+    description:
+      "Get the last 10 messages from this conversation. Only use this when you've genuinely lost track of what was said earlier in a long session.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+];
