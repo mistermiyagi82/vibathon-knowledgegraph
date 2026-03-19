@@ -70,6 +70,7 @@ export default function ChatView({ chatId }: Props) {
   async function loadMessages() {
     try {
       const res = await fetch(`/api/chats/${chatId}`);
+      if (res.status === 404) { router.push("/"); return; }
       if (!res.ok) return;
       const data = await res.json();
       setMessages(data.messages || []);
@@ -194,6 +195,10 @@ export default function ChatView({ chatId }: Props) {
             if (payload.error) {
               setIsStreaming(false);
               setStreamingContent("");
+              setMessages((prev) => [
+                ...prev,
+                { id: `err-${Date.now()}`, role: "assistant" as const, content: "Something went wrong. Please try again.", timestamp: new Date().toISOString() },
+              ]);
             }
           } catch {}
         }
@@ -201,7 +206,11 @@ export default function ChatView({ chatId }: Props) {
     } catch {
       setIsStreaming(false);
       setStreamingContent("");
-      setMessages((prev) => prev.filter((m) => m.id !== tempUserId));
+      setMessages((prev) => [
+        ...prev.filter((m) => m.id !== tempUserId),
+        { id: tempUserId, role: "user" as const, content: text, timestamp: new Date().toISOString() },
+        { id: `err-${Date.now()}`, role: "assistant" as const, content: "Something went wrong. Please try again.", timestamp: new Date().toISOString() },
+      ]);
     }
   }
 
