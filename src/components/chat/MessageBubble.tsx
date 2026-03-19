@@ -8,6 +8,7 @@ interface Props {
   message: Message;
   streaming?: boolean;
   onOpenContext?: (messageId: string) => void;
+  isActive?: boolean;
   isNew?: boolean;
 }
 
@@ -22,7 +23,7 @@ function formatTimeHover(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-export default function MessageBubble({ message, streaming, onOpenContext, isNew }: Props) {
+export default function MessageBubble({ message, streaming, onOpenContext, isActive, isNew }: Props) {
   const [hovered, setHovered] = useState(false);
   const isAssistant = message.role === "assistant";
 
@@ -30,7 +31,12 @@ export default function MessageBubble({ message, streaming, onOpenContext, isNew
     const clickable = !streaming && !!onOpenContext;
     return (
       <div
-        className={`mb-8 ${isNew ? "animate-fade-in" : ""} ${clickable ? "cursor-pointer -mx-3 px-3 py-2 rounded-lg hover:bg-ink/5 transition-colors duration-150" : ""}`}
+        className={[
+          "mb-8",
+          isNew ? "animate-fade-in" : "",
+          clickable && !isActive ? "cursor-pointer -mx-3 px-3 py-2 rounded-lg transition-colors duration-150 hover:bg-ink/5" : "",
+          clickable && isActive ? "cursor-pointer -mx-3 pl-2 pr-3 py-2 rounded-lg border-l-2 border-violet-400 bg-violet-50/60" : "",
+        ].join(" ")}
         onClick={clickable ? () => onOpenContext!(message.id) : undefined}
       >
         <div className="text-sm leading-7 text-ink font-light prose-sm prose-neutral max-w-none [&_strong]:font-semibold [&_em]:italic [&_code]:bg-ink/8 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-ink/5 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5">

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import type { MemoryOverview } from "@/types";
+import InfoTooltip from "./InfoTooltip";
 
 interface Props {
   overview: MemoryOverview | null;
@@ -30,12 +31,15 @@ export default function MemoryModal({ overview, memoryUpdated, onClose }: Props)
       <div className="fixed top-0 right-0 h-full w-full sm:w-80 z-50 bg-background shadow-xl animate-fade-in flex flex-col">
         <div className="flex items-center justify-between px-6 py-5 border-b border-ink/6">
           <p className="text-xs text-muted uppercase tracking-widest font-light">Memory</p>
-          <button
-            onClick={onClose}
-            className="text-muted hover:text-ink transition-colors text-lg leading-none"
-          >
-            ×
-          </button>
+          <div className="flex items-center gap-2">
+            <InfoTooltip text="This is everything the assistant remembers about you across all conversations — facts it has learned, files you've shared, and your session history." />
+            <button
+              onClick={onClose}
+              className="text-muted hover:text-ink transition-colors text-lg leading-none"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">

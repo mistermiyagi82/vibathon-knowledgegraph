@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { MessageContext } from "@/types";
+import InfoTooltip from "./InfoTooltip";
 
 interface Props {
   context: MessageContext;
@@ -29,7 +30,10 @@ export default function ContextModal({ context, onClose }: Props) {
       <div className="fixed top-0 left-0 h-full w-full sm:w-80 z-50 bg-background shadow-xl animate-fade-in flex flex-col">
         <div className="flex items-center justify-between px-6 py-5 border-b border-ink/6">
           <p className="text-xs text-muted uppercase tracking-widest font-light">Sources</p>
-          <button onClick={onClose} className="text-muted hover:text-ink transition-colors text-lg leading-none">×</button>
+          <div className="flex items-center gap-2">
+            <InfoTooltip text="These are the sources this assistant used to generate this specific response — knowledge graph facts, previous conversation history, and uploaded files." />
+            <button onClick={onClose} className="text-muted hover:text-ink transition-colors text-lg leading-none">×</button>
+          </div>
         </div>
 
         {/* Legend — clickable toggles */}

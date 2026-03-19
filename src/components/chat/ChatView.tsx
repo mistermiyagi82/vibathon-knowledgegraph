@@ -219,6 +219,7 @@ export default function ChatView({ chatId }: Props) {
         key={msg.id}
         message={msg}
         onOpenContext={msg.role === "assistant" ? handleOpenContext : undefined}
+        isActive={msg.id === activeMessageId}
         isNew={newMessageIds.includes(msg.id)}
       />
     );
@@ -342,7 +343,7 @@ export default function ChatView({ chatId }: Props) {
       {contextMessage && (
         <ContextModal
           context={contextMessage}
-          onClose={() => setContextMessage(null)}
+          onClose={() => { setContextMessage(null); setActiveMessageId(null); }}
         />
       )}
     </div>
