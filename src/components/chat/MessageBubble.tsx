@@ -56,11 +56,7 @@ export default function MessageBubble({ message, streaming, onOpenContext, isNew
 
   // User message — right-aligned white card
   return (
-    <div
-      className={`flex justify-end mb-6 ${isNew ? "animate-slide-up" : ""}`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
+    <div className={`flex justify-end mb-8 ${isNew ? "animate-slide-up" : ""}`}>
       <div className="max-w-[70%]">
         <div className="bg-white rounded-2xl px-4 py-3 shadow-sm">
           <p className="text-sm leading-6 text-ink whitespace-pre-wrap">{message.content}</p>
@@ -76,11 +72,9 @@ export default function MessageBubble({ message, streaming, onOpenContext, isNew
             </a>
           ))}
         </div>
-        {hovered && (
-          <div className="flex justify-end mt-1 animate-fade-in">
-            <span className="text-xs text-muted/50">{formatTimeHover(message.timestamp)}</span>
-          </div>
-        )}
+        <div className="flex justify-end mt-2">
+          <span className="text-xs text-muted/60">{formatTimestamp(message.timestamp)}</span>
+        </div>
       </div>
     </div>
   );

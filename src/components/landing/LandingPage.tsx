@@ -66,7 +66,7 @@ export default function LandingPage() {
 
       {/* Center content */}
       <div className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl px-8 -mt-16">
-        <h1 className="text-3xl font-light text-ink mb-10 text-center leading-snug tracking-tight">
+        <h1 className="text-3xl font-normal text-ink mb-10 text-center leading-snug">
           Hey, what do you want to chat about today?
         </h1>
 

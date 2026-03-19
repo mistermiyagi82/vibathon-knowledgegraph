@@ -248,7 +248,7 @@ export default function ChatView({ chatId }: Props) {
           </svg>
         </button>
 
-        {/* Memory button */}
+        {/* Memory button — gear icon */}
         <button
           onClick={() => setMemoryOpen(true)}
           className="menu-fade p-1.5 rounded-lg hover:bg-ink/5 transition-colors"
@@ -256,8 +256,14 @@ export default function ChatView({ chatId }: Props) {
           title="Memory"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.2" />
-            <circle cx="8" cy="8" r="2" fill="currentColor" />
+            <path
+              d="M8 5a3 3 0 1 0 0 6A3 3 0 0 0 8 5zm0 1.2a1.8 1.8 0 1 1 0 3.6A1.8 1.8 0 0 1 8 6.2z"
+              fill="currentColor"
+            />
+            <path
+              d="M6.6 1.4l-.4 1.1a5 5 0 0 0-.9.5l-1.1-.3-1.4 2.4.8.8a5 5 0 0 0 0 1l-.8.8 1.4 2.4 1.1-.3c.3.2.6.4.9.5l.4 1.1h2.8l.4-1.1c.3-.1.6-.3.9-.5l1.1.3 1.4-2.4-.8-.8a5 5 0 0 0 0-1l.8-.8-1.4-2.4-1.1.3a5 5 0 0 0-.9-.5L9.4 1.4H6.6zm.6 1.2h1.6l.3.9.5.3c.2.1.5.3.7.4l.5.2.9-.2.8 1.4-.7.7.1.5c0 .2.1.4.1.6s0 .4-.1.6l-.1.5.7.7-.8 1.4-.9-.2-.5.2c-.2.1-.5.3-.7.4l-.5.3-.3.9H7.2l-.3-.9-.5-.3a4 4 0 0 1-.7-.4l-.5-.2-.9.2-.8-1.4.7-.7-.1-.5A3.5 3.5 0 0 1 4 8c0-.2 0-.4.1-.6l.1-.5-.7-.7.8-1.4.9.2.5-.2c.2-.1.5-.3.7-.4l.5-.3.3-.9z"
+              fill="currentColor"
+            />
           </svg>
         </button>
       </div>

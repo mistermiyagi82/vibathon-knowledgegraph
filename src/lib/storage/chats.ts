@@ -20,7 +20,7 @@ export function listChats(): Chat[] {
       return JSON.parse(fs.readFileSync(metaPath, "utf-8")) as Chat;
     })
     .filter(Boolean)
-    .sort((a, b) => new Date(b!.updatedAt).getTime() - new Date(a!.updatedAt).getTime()) as Chat[];
+    .sort((a, b) => new Date(b!.createdAt).getTime() - new Date(a!.createdAt).getTime()) as Chat[];
 }
 
 export function createChat(id: string, title = "New Chat"): Chat {
