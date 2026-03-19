@@ -303,18 +303,51 @@ export default function ChatView({ chatId }: Props) {
       <div className="shrink-0 py-4 sm:py-5">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 flex items-center justify-between">
         <div className="flex items-center gap-1">
-          {/* Menu button */}
-          <button
-            onClick={() => setMenuOpen((o) => !o)}
-            className="menu-fade p-1.5 rounded-lg hover:bg-ink/5 transition-colors"
-            aria-label="Menu"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <rect x="2" y="3.5" width="12" height="1.2" rx="0.6" fill="currentColor" />
-              <rect x="2" y="7.4" width="12" height="1.2" rx="0.6" fill="currentColor" />
-              <rect x="2" y="11.3" width="12" height="1.2" rx="0.6" fill="currentColor" />
-            </svg>
-          </button>
+          {/* Menu button — relative so dropdown anchors to it */}
+          <div className="relative">
+            <button
+              onClick={() => setMenuOpen((o) => !o)}
+              className="menu-fade p-1.5 rounded-lg hover:bg-ink/5 transition-colors"
+              aria-label="Menu"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="3.5" width="12" height="1.2" rx="0.6" fill="currentColor" />
+                <rect x="2" y="7.4" width="12" height="1.2" rx="0.6" fill="currentColor" />
+                <rect x="2" y="11.3" width="12" height="1.2" rx="0.6" fill="currentColor" />
+              </svg>
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+                <div
+                  className="absolute top-full left-0 mt-2 z-50 bg-background border border-ink/8 rounded-xl shadow-sm py-2 w-52 animate-fade-in"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => { setMenuOpen(false); router.push("/"); }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-ink/70 hover:text-ink hover:bg-ink/4 transition-colors"
+                  >
+                    ← Home
+                  </button>
+                  {recentChats.length > 0 && (
+                    <div className="border-t border-ink/8 mt-1 pt-1">
+                      {recentChats.slice(0, 8).map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => { setMenuOpen(false); router.push(`/chat/${c.id}`); }}
+                          className={`w-full text-left px-4 py-2 text-sm truncate transition-colors ${
+                            c.id === chatId ? "text-ink" : "text-ink/60 hover:text-ink hover:bg-ink/4"
+                          }`}
+                        >
+                          {c.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Back button */}
           <button
@@ -352,40 +385,6 @@ export default function ChatView({ chatId }: Props) {
       </div>
       </div>
 
-      {/* Menu overlay */}
-      {menuOpen && (
-        <div
-          className="fixed inset-0 z-40 animate-fade-in"
-          onClick={() => setMenuOpen(false)}
-        >
-          <div
-            className="absolute top-14 left-8 bg-background border border-ink/8 rounded-xl shadow-sm py-2 w-max max-w-xs"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => { setMenuOpen(false); router.push("/"); }}
-              className="w-full text-left px-4 py-2.5 text-sm text-ink/70 hover:text-ink hover:bg-ink/4 transition-colors"
-            >
-              ← Home
-            </button>
-            {recentChats.length > 0 && (
-              <div className="border-t border-ink/8 mt-1 pt-1">
-                {recentChats.slice(0, 8).map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => { setMenuOpen(false); router.push(`/chat/${c.id}`); }}
-                    className={`w-full text-left px-4 py-2 text-sm truncate transition-colors ${
-                      c.id === chatId ? "text-ink" : "text-ink/60 hover:text-ink hover:bg-ink/4"
-                    }`}
-                  >
-                    {c.title}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Messages — scrollable, centered */}
       <div className="flex-1 min-h-0 relative">
