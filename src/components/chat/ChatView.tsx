@@ -300,18 +300,31 @@ export default function ChatView({ chatId }: Props) {
       {/* Top bar */}
       <div className="shrink-0 py-4 sm:py-5">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 flex items-center justify-between">
-        {/* Menu button */}
-        <button
-          onClick={() => setMenuOpen((o) => !o)}
-          className="menu-fade p-1.5 rounded-lg hover:bg-ink/5 transition-colors"
-          aria-label="Menu"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <rect x="2" y="3.5" width="12" height="1.2" rx="0.6" fill="currentColor" />
-            <rect x="2" y="7.4" width="12" height="1.2" rx="0.6" fill="currentColor" />
-            <rect x="2" y="11.3" width="12" height="1.2" rx="0.6" fill="currentColor" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-1">
+          {/* Menu button */}
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            className="menu-fade p-1.5 rounded-lg hover:bg-ink/5 transition-colors"
+            aria-label="Menu"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="3.5" width="12" height="1.2" rx="0.6" fill="currentColor" />
+              <rect x="2" y="7.4" width="12" height="1.2" rx="0.6" fill="currentColor" />
+              <rect x="2" y="11.3" width="12" height="1.2" rx="0.6" fill="currentColor" />
+            </svg>
+          </button>
+
+          {/* Back button */}
+          <button
+            onClick={() => router.push("/")}
+            className="menu-fade p-1.5 rounded-lg hover:bg-ink/5 transition-colors"
+            aria-label="Back to home"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
 
         {/* Memory button — gear icon */}
         <button
