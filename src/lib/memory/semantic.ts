@@ -7,6 +7,7 @@ const DATA_PATH = process.env.DATA_PATH || "./data";
 // v1: keyword search over all past MD files
 export async function semanticSearch(
   query: string,
+  excludeChatId?: string,
   limit = 5
 ): Promise<HistoryExcerpt[]> {
   const chatsDir = path.join(DATA_PATH, "chats");
@@ -17,6 +18,7 @@ export async function semanticSearch(
 
   const chatIds = fs.readdirSync(chatsDir);
   for (const chatId of chatIds) {
+    if (excludeChatId && chatId === excludeChatId) continue;
     const messagesPath = path.join(chatsDir, chatId, "messages.md");
     const metaPath = path.join(chatsDir, chatId, "meta.json");
     if (!fs.existsSync(messagesPath)) continue;
