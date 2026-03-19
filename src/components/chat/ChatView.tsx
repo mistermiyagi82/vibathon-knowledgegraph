@@ -27,6 +27,7 @@ export default function ChatView({ chatId }: Props) {
   const [memoryUpdated, setMemoryUpdated] = useState(false);
 
   const [contextMessage, setContextMessage] = useState<MessageContext | null>(null);
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [recentChats, setRecentChats] = useState<Array<{ id: string; title: string }>>([]);
@@ -92,9 +93,11 @@ export default function ChatView({ chatId }: Props) {
 
   async function handleOpenContext(messageId: string) {
     try {
+      setActiveMessageId(messageId);
       const res = await fetch(`/api/context/${messageId}`);
       if (res.ok) setContextMessage(await res.json());
-    } catch {}
+      else setActiveMessageId(null);
+    } catch { setActiveMessageId(null); }
   }
 
   async function sendMessage(text: string, file?: File) {
