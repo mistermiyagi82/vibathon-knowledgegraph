@@ -1,3 +1,9 @@
+export interface AgentConfig {
+  systemPrompt?: string; // Overrides global prompt for this chat
+  model?: string;        // Model override
+  tools?: string[];      // Which tools are enabled
+}
+
 export interface Chat {
   id: string;
   title: string;
@@ -5,6 +11,11 @@ export interface Chat {
   updatedAt: string;
   messageCount: number;
   lastMessagePreview?: string;
+  // Recruiter agent fields
+  contactId?: string;
+  contactName?: string;
+  templateId?: string;
+  agentConfig?: AgentConfig;
 }
 
 export interface PerfEntry {
@@ -58,4 +69,25 @@ export interface MemoryOverview {
     firstSession: string;
     lastSession: string;
   };
+}
+
+export interface AttioContact {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  company?: string;
+  jobTitle?: string;
+  notes?: string;
+  status?: string;
+}
+
+export interface Template {
+  id: string;
+  name: string;
+  description: string;
+  party: "candidate" | "recruiter" | "client" | "general";
+  systemPrompt: string;
+  model?: string;
+  tools?: string[];
 }

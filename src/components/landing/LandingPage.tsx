@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import type { Chat } from "@/types";
+import type { Chat, AttioContact, Template } from "@/types";
+import ContactPicker from "./ContactPicker";
+import TemplatePicker from "./TemplatePicker";
 
 function formatRelativeTime(iso: string): string {
   const date = new Date(iso);
@@ -19,6 +21,8 @@ function formatRelativeTime(iso: string): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+type ModalStep = "mode" | "contact" | "template";
+
 export default function LandingPage() {
   const router = useRouter();
   const [chats, setChats] = useState<Chat[]>([]);
@@ -26,10 +30,20 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Recruiter modal state
+  const [modalStep, setModalStep] = useState<ModalStep | null>(null);
+  const [selectedContact, setSelectedContact] = useState<AttioContact | null>(null);
+  const [creatingRecruiterChat, setCreatingRecruiterChat] = useState(false);
+
   useEffect(() => {
     inputRef.current?.focus();
     fetchChats();
   }, []);
+
+  // Focus input when modal is closed
+  useEffect(() => {
+    if (!modalStep) setTimeout(() => inputRef.current?.focus(), 50);
+  }, [modalStep]);
 
   async function fetchChats() {
     try {
@@ -50,6 +64,38 @@ export default function LandingPage() {
     } catch {
       setLoading(false);
     }
+  }
+
+  function handleSelectContact(contact: AttioContact) {
+    setSelectedContact(contact);
+    setModalStep("template");
+  }
+
+  async function handleSelectTemplate(template: Template | null) {
+    if (!selectedContact) return;
+    setCreatingRecruiterChat(true);
+
+    try {
+      const res = await fetch("/api/chats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contactId: selectedContact.id,
+          contactName: selectedContact.name,
+          templateId: template?.id ?? null,
+        }),
+      });
+      const chat: Chat = await res.json();
+      router.push(`/chat/${chat.id}`);
+    } catch {
+      setCreatingRecruiterChat(false);
+    }
+  }
+
+  function closeModal() {
+    setModalStep(null);
+    setSelectedContact(null);
+    setCreatingRecruiterChat(false);
   }
 
   return (
@@ -84,7 +130,18 @@ export default function LandingPage() {
         </form>
 
         {/* Divider */}
-        <div className="w-full sm:w-4/5 mx-auto h-px bg-ink/10 mt-4 mb-8" />
+        <div className="w-full sm:w-4/5 mx-auto h-px bg-ink/10 mt-4 mb-6" />
+
+        {/* Start a candidate chat button */}
+        <div className="w-full sm:w-4/5 mx-auto mb-8">
+          <button
+            onClick={() => setModalStep("contact")}
+            className="flex items-center gap-2 text-sm text-ink/40 hover:text-ink/70 transition-colors"
+          >
+            <span className="w-5 h-5 rounded-full border border-ink/20 flex items-center justify-center text-xs">+</span>
+            Start a candidate chat
+          </button>
+        </div>
 
         {/* Recent chats — staggered fade-in */}
         {chats.length > 0 && (
@@ -97,9 +154,16 @@ export default function LandingPage() {
                 style={{ animationDelay: `${i * 60}ms`, animationFillMode: "both" }}
               >
                 <div className="flex-1 min-w-0 pr-6">
-                  <span className="text-[1.05rem] text-ink font-normal block truncate">
-                    {chat.title}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[1.05rem] text-ink font-normal block truncate">
+                      {chat.title}
+                    </span>
+                    {chat.templateId && (
+                      <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted border border-ink/10 rounded-full px-1.5 py-0.5">
+                        {chat.templateId}
+                      </span>
+                    )}
+                  </div>
                   {chat.lastMessagePreview && (
                     <span className="text-[0.9rem] text-muted block truncate mt-0.5">
                       {chat.lastMessagePreview}
@@ -114,6 +178,44 @@ export default function LandingPage() {
           </div>
         )}
       </div>
+
+      {/* Recruiter modal */}
+      {modalStep && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
+          <div className="absolute inset-0 bg-black/20" onClick={closeModal} />
+          <div className="relative bg-background rounded-2xl shadow-lg w-full max-w-md mx-4 p-6 animate-fade-in">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-5">
+              <span className="text-sm font-medium text-ink">
+                {modalStep === "contact" && "Pick a contact"}
+                {modalStep === "template" && "Choose agent type"}
+              </span>
+              <button
+                onClick={closeModal}
+                className="text-ink/40 hover:text-ink transition-colors text-lg leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            {modalStep === "contact" && (
+              <ContactPicker
+                onSelect={handleSelectContact}
+                onBack={closeModal}
+              />
+            )}
+
+            {modalStep === "template" && selectedContact && (
+              <TemplatePicker
+                contact={selectedContact}
+                onSelect={handleSelectTemplate}
+                onBack={() => setModalStep("contact")}
+                loading={creatingRecruiterChat}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </main>
   );
 }

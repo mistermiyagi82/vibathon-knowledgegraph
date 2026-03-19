@@ -4,6 +4,19 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { anthropic, MEMORY_TOOLS } from "@/lib/anthropic";
 import { getSystemPrompt } from "@/lib/prompt";
+import { queryGraphMemory } from "@/lib/memory/graph";
+import { semanticSearch } from "@/lib/memory/semantic";
+import { getRecentMessages, getMessages, formatRecentMessages } from "@/lib/memory/recent";
+import { appendMessage, updateChatMeta, getChatMeta } from "@/lib/storage/chats";
+import { listChatFiles, readFileContents } from "@/lib/storage/files";
+import { processConversation } from "@/lib/memory/processor";
+import { embedText } from "@/lib/memory/embed";
+import { indexChunk } from "@/lib/memory/vectordb";
+import { getAttioContact, formatContactContext } from "@/lib/attio";
+import { getCalendarAvailability, formatAvailability } from "@/lib/calendar";
+import fs from "fs";
+import path from "path";
+import type { Message, MessageContext } from "@/types";
 
 function getOpenAIClient() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? "" });
@@ -16,9 +29,82 @@ const GROQ_MODELS = new Set(["llama-3.3-70b-versatile", "llama-3.1-8b-instant", 
 const isOpenAIModel = (m: string) => m.startsWith("gpt-") || m.startsWith("o1") || m.startsWith("o3") || m.startsWith("o4");
 const isGroqModel = (m: string) => GROQ_MODELS.has(m);
 
+function getThinkingLabel(toolName: string): string {
+  switch (toolName) {
+    case "query_memory": return "Checking memory...";
+    case "search_history": return "Looking through past conversations...";
+    case "get_recent_messages": return "Reading recent messages...";
+    case "get_chat_history": return "Looking through conversation history...";
+    case "get_attio_contact": return "Looking up candidate profile...";
+    case "get_calendar_availability": return "Checking calendar availability...";
+    default: return "Thinking...";
+  }
+}
+
+async function executeTool(
+  name: string,
+  input: Record<string, string>,
+  chatId: string
+): Promise<{ result: string; partialContext: Partial<MessageContext> }> {
+  if (name === "query_memory") {
+    const facts = await queryGraphMemory(input.question ?? "", chatId);
+    return {
+      result:
+        facts.map((f) => `${f.subject} -[${f.relationship}]-> ${f.object}`).join("\n") ||
+        "No relevant facts found.",
+      partialContext: { graph: facts },
+    };
+  }
+  if (name === "search_history") {
+    const excerpts = await semanticSearch(input.query ?? "", chatId);
+    return {
+      result:
+        excerpts.map((e) => `[${e.chatTitle}] ${e.excerpt}`).join("\n\n") ||
+        "No relevant history found.",
+      partialContext: { history: excerpts },
+    };
+  }
+  if (name === "get_recent_messages") {
+    const recent = getRecentMessages(chatId, 10);
+    return {
+      result: formatRecentMessages(recent) || "No recent messages.",
+      partialContext: { recent: recent.length > 0 },
+    };
+  }
+  if (name === "get_chat_history") {
+    const offset = typeof input.offset === "string" ? parseInt(input.offset) : (input.offset as unknown as number ?? 0);
+    const limit = typeof input.limit === "string" ? parseInt(input.limit) : (input.limit as unknown as number ?? 10);
+    const msgs = getMessages(chatId, offset, limit);
+    return {
+      result: formatRecentMessages(msgs) || "No messages found at that position.",
+      partialContext: {},
+    };
+  }
+  if (name === "get_attio_contact") {
+    const contactId = input.contact_id;
+    if (!contactId) return { result: "No contact_id provided.", partialContext: {} };
+    const contact = await getAttioContact(contactId);
+    if (!contact) return { result: "Contact not found in Attio.", partialContext: {} };
+    return {
+      result: formatContactContext(contact),
+      partialContext: {},
+    };
+  }
+  if (name === "get_calendar_availability") {
+    const person = input.person as "daniel" | "daisy";
+    const result = await getCalendarAvailability(person, input.date_from, input.date_to);
+    return {
+      result: formatAvailability(person, result),
+      partialContext: {},
+    };
+  }
+  return { result: "Unknown tool.", partialContext: {} };
+}
+
 async function runOpenAICompatibleStream(
   client: OpenAI,
   model: string,
+  systemPrompt: string,
   initialContent: string,
   chatId: string,
   context: MessageContext,
@@ -32,7 +118,7 @@ async function runOpenAICompatibleStream(
   }));
 
   const msgs: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: getSystemPrompt() },
+    { role: "system", content: systemPrompt },
     { role: "user", content: initialContent },
   ];
 
@@ -108,69 +194,6 @@ async function runOpenAICompatibleStream(
 
   return fullResponse;
 }
-import { queryGraphMemory } from "@/lib/memory/graph";
-import { semanticSearch } from "@/lib/memory/semantic";
-import { getRecentMessages, getMessages, formatRecentMessages } from "@/lib/memory/recent";
-import { appendMessage, updateChatMeta } from "@/lib/storage/chats";
-import { listChatFiles, readFileContents } from "@/lib/storage/files";
-import { processConversation } from "@/lib/memory/processor";
-import { embedText } from "@/lib/memory/embed";
-import { indexChunk } from "@/lib/memory/vectordb";
-import fs from "fs";
-import path from "path";
-import type { Message, MessageContext } from "@/types";
-
-function getThinkingLabel(toolName: string): string {
-  switch (toolName) {
-    case "query_memory": return "Checking memory...";
-    case "search_history": return "Looking through past conversations...";
-    case "get_recent_messages": return "Reading recent messages...";
-    case "get_chat_history": return "Looking through conversation history...";
-    default: return "Thinking...";
-  }
-}
-
-async function executeTool(
-  name: string,
-  input: Record<string, string>,
-  chatId: string
-): Promise<{ result: string; partialContext: Partial<MessageContext> }> {
-  if (name === "query_memory") {
-    const facts = await queryGraphMemory(input.question ?? "");
-    return {
-      result:
-        facts.map((f) => `${f.subject} -[${f.relationship}]-> ${f.object}`).join("\n") ||
-        "No relevant facts found.",
-      partialContext: { graph: facts },
-    };
-  }
-  if (name === "search_history") {
-    const excerpts = await semanticSearch(input.query ?? "", chatId);
-    return {
-      result:
-        excerpts.map((e) => `[${e.chatTitle}] ${e.excerpt}`).join("\n\n") ||
-        "No relevant history found.",
-      partialContext: { history: excerpts },
-    };
-  }
-  if (name === "get_recent_messages") {
-    const recent = getRecentMessages(chatId, 10);
-    return {
-      result: formatRecentMessages(recent) || "No recent messages.",
-      partialContext: { recent: recent.length > 0 },
-    };
-  }
-  if (name === "get_chat_history") {
-    const offset = typeof input.offset === "string" ? parseInt(input.offset) : (input.offset as unknown as number ?? 0);
-    const limit = typeof input.limit === "string" ? parseInt(input.limit) : (input.limit as unknown as number ?? 10);
-    const msgs = getMessages(chatId, offset, limit);
-    return {
-      result: formatRecentMessages(msgs) || "No messages found at that position.",
-      partialContext: {},
-    };
-  }
-  return { result: "Unknown tool.", partialContext: {} };
-}
 
 // POST /api/chats/:chatId/messages — send a message and stream Claude's response
 export async function POST(req: Request, { params }: { params: { chatId: string } }) {
@@ -188,6 +211,10 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
   const encoder = new TextEncoder();
   let fullResponse = "";
 
+  // Load chat meta for per-chat config and contact injection
+  const chatMeta = getChatMeta(chatId);
+  const systemPrompt = getSystemPrompt(chatId);
+
   // Read uploaded files for this chat and inject contents
   const chatFiles = listChatFiles(chatId);
   const fileBlocks = chatFiles
@@ -197,10 +224,25 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
     })
     .filter((b): b is string => b !== null);
 
+  // Auto-inject Attio contact context on first message if chat has a contactId
+  let contactContextBlock = "";
+  if (isFirstMessage && chatMeta?.contactId) {
+    try {
+      const contact = await getAttioContact(chatMeta.contactId);
+      if (contact) {
+        contactContextBlock = `\n\n[Candidate Profile from Attio]\n${formatContactContext(contact)}`;
+      }
+    } catch { /* non-critical */ }
+  }
+
   const initialContent =
-    fileBlocks.length > 0
-      ? `${userText}\n\n[Files in this conversation]\n${fileBlocks.join("\n\n")}`
-      : userText;
+    [
+      userText,
+      fileBlocks.length > 0 ? `\n\n[Files in this conversation]\n${fileBlocks.join("\n\n")}` : "",
+      contactContextBlock,
+    ]
+      .filter(Boolean)
+      .join("");
 
   const context: MessageContext = { graph: [], history: [], files: chatFiles, recent: false };
 
@@ -214,66 +256,66 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
 
       try {
         if (isOpenAIModel(model)) {
-          fullResponse = await runOpenAICompatibleStream(getOpenAIClient(), model, initialContent, chatId, context, perf, emit, t);
+          fullResponse = await runOpenAICompatibleStream(getOpenAIClient(), model, systemPrompt, initialContent, chatId, context, perf, emit, t);
         } else if (isGroqModel(model)) {
-          fullResponse = await runOpenAICompatibleStream(getGroqClient(), model, initialContent, chatId, context, perf, emit, t);
+          fullResponse = await runOpenAICompatibleStream(getGroqClient(), model, systemPrompt, initialContent, chatId, context, perf, emit, t);
         } else {
-        // Streaming tool-use loop — streams immediately, detects tool calls mid-stream
-        const msgs: Anthropic.MessageParam[] = [{ role: "user", content: initialContent }];
+          // Anthropic Claude path
+          const msgs: Anthropic.MessageParam[] = [{ role: "user", content: initialContent }];
 
-        for (let i = 0; i < 5; i++) {
-          const claudeStart = t();
-          let firstToken = true;
+          for (let i = 0; i < 5; i++) {
+            const claudeStart = t();
+            let firstToken = true;
 
-          const claudeStream = anthropic.messages.stream({
-            model,
-            max_tokens: 4096,
-            system: getSystemPrompt(),
-            tools: MEMORY_TOOLS,
-            messages: msgs,
-          });
+            const claudeStream = anthropic.messages.stream({
+              model,
+              max_tokens: 4096,
+              system: systemPrompt,
+              tools: MEMORY_TOOLS,
+              messages: msgs,
+            });
 
-          for await (const chunk of claudeStream) {
-            if (chunk.type === "content_block_start" && chunk.content_block.type === "tool_use") {
-              emit({ thinking: getThinkingLabel(chunk.content_block.name) });
-            }
-            if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
-              if (firstToken) {
-                perf.push({ step: i === 0 ? "Time to first token" : "Time to first token (after tools)", ms: t() - claudeStart });
-                firstToken = false;
+            for await (const chunk of claudeStream) {
+              if (chunk.type === "content_block_start" && chunk.content_block.type === "tool_use") {
+                emit({ thinking: getThinkingLabel(chunk.content_block.name) });
               }
-              fullResponse += chunk.delta.text;
-              emit({ text: chunk.delta.text });
+              if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+                if (firstToken) {
+                  perf.push({ step: i === 0 ? "Time to first token" : "Time to first token (after tools)", ms: t() - claudeStart });
+                  firstToken = false;
+                }
+                fullResponse += chunk.delta.text;
+                emit({ text: chunk.delta.text });
+              }
             }
+
+            const finalMessage = await claudeStream.finalMessage();
+            if (firstToken) {
+              perf.push({ step: `Claude API call ${i + 1}`, ms: t() - claudeStart });
+            }
+            if (finalMessage.stop_reason !== "tool_use") break;
+
+            msgs.push({ role: "assistant", content: finalMessage.content });
+
+            const toolResults: Anthropic.ToolResultBlockParam[] = [];
+            for (const block of finalMessage.content) {
+              if (block.type !== "tool_use") continue;
+              const toolStart = t();
+              const { result, partialContext } = await executeTool(
+                block.name,
+                block.input as Record<string, string>,
+                chatId
+              );
+              perf.push({ step: block.name, ms: t() - toolStart });
+              if (partialContext.graph) context.graph.push(...partialContext.graph);
+              if (partialContext.history) context.history.push(...partialContext.history);
+              if (partialContext.recent) context.recent = true;
+              toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
+            }
+
+            msgs.push({ role: "user", content: toolResults });
           }
-
-          const finalMessage = await claudeStream.finalMessage();
-          if (firstToken) {
-            perf.push({ step: `Claude API call ${i + 1}`, ms: t() - claudeStart });
-          }
-          if (finalMessage.stop_reason !== "tool_use") break;
-
-          msgs.push({ role: "assistant", content: finalMessage.content });
-
-          const toolResults: Anthropic.ToolResultBlockParam[] = [];
-          for (const block of finalMessage.content) {
-            if (block.type !== "tool_use") continue;
-            const toolStart = t();
-            const { result, partialContext } = await executeTool(
-              block.name,
-              block.input as Record<string, string>,
-              chatId
-            );
-            perf.push({ step: block.name, ms: t() - toolStart });
-            if (partialContext.graph) context.graph.push(...partialContext.graph);
-            if (partialContext.history) context.history.push(...partialContext.history);
-            if (partialContext.recent) context.recent = true;
-            toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
-          }
-
-          msgs.push({ role: "user", content: toolResults });
         }
-        } // end Anthropic path
 
         const now = new Date().toISOString();
         const userMessage: Message = { id: userId, role: "user", content: userText, timestamp: now };
@@ -293,7 +335,12 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
 
         let title: string | undefined;
         if (isFirstMessage) {
-          title = await generateTitle(userText);
+          // Use contact name as title if this is a recruiter chat, otherwise auto-generate
+          if (chatMeta?.contactName) {
+            title = chatMeta.contactName;
+          } else {
+            title = await generateTitle(userText);
+          }
           updateChatMeta(chatId, { title, updatedAt: now });
         } else {
           updateChatMeta(chatId, { updatedAt: now });
@@ -362,7 +409,7 @@ async function handleMemoryCommand(chatId: string, messageId: string, userId: st
   const encoder = new TextEncoder();
   let fullResponse = "";
 
-  const graphFacts = await queryGraphMemory("");
+  const graphFacts = await queryGraphMemory("", chatId);
   const graphSummary = graphFacts
     .map((f) => `${f.subject} -[${f.relationship}]-> ${f.object}`)
     .join("\n");
@@ -373,7 +420,7 @@ async function handleMemoryCommand(chatId: string, messageId: string, userId: st
         const claudeStream = anthropic.messages.stream({
           model: "claude-sonnet-4-6",
           max_tokens: 1024,
-          system: getSystemPrompt(),
+          system: getSystemPrompt(chatId),
           messages: [
             {
               role: "user",

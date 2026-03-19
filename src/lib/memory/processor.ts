@@ -14,8 +14,8 @@ export async function processConversation(
   const recentMessages = getRecentMessages(chatId, 20);
   const conversationContext = formatRecentMessages(recentMessages);
 
-  // Get existing graph facts so Claude can avoid duplicating them
-  const existingFacts = await queryGraphMemory("");
+  // Get existing graph facts scoped to this chat
+  const existingFacts = await queryGraphMemory("", chatId);
   const existingFactsStr =
     existingFacts.map((f) => `${f.subject} -[${f.relationship}]-> ${f.object}`).join("\n") ||
     "(none yet)";
@@ -62,7 +62,7 @@ Return [] if there is genuinely nothing new worth adding.`,
     const json = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
     const entities = JSON.parse(json);
     if (Array.isArray(entities) && entities.length > 0) {
-      await writeEntities(entities);
+      await writeEntities(entities, chatId);
     }
   } catch {
     // Memory building is non-critical — silently fail

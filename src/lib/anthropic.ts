@@ -91,4 +91,43 @@ export const MEMORY_TOOLS: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "get_attio_contact",
+    description:
+      "Retrieve the full Attio CRM profile for the current candidate — their background, experience, current recruitment status, and any notes. Use this when you need fresh or detailed candidate information.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        contact_id: {
+          type: "string",
+          description: "The Attio contact record ID (available from chat context)",
+        },
+      },
+      required: ["contact_id"],
+    },
+  },
+  {
+    name: "get_calendar_availability",
+    description:
+      "Check Daniel or Daisy's Google Calendar for available meeting slots. Use this when a candidate wants to schedule an interview or meeting, or when you need to propose times.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        person: {
+          type: "string",
+          enum: ["daniel", "daisy"],
+          description: "Whose calendar to check",
+        },
+        date_from: {
+          type: "string",
+          description: "Start date in YYYY-MM-DD format",
+        },
+        date_to: {
+          type: "string",
+          description: "End date in YYYY-MM-DD format (inclusive). Usually 3-5 days after date_from.",
+        },
+      },
+      required: ["person", "date_from", "date_to"],
+    },
+  },
 ];

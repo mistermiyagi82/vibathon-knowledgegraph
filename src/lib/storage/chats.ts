@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import type { Chat, Message, MessageContext, PerfEntry } from "@/types";
+import type { Chat, Message, MessageContext, PerfEntry, AgentConfig } from "@/types";
 
 const DATA_PATH = process.env.DATA_PATH || "./data";
 
@@ -23,19 +23,48 @@ export function listChats(): Chat[] {
     .sort((a, b) => new Date(b!.createdAt).getTime() - new Date(a!.createdAt).getTime()) as Chat[];
 }
 
-export function createChat(id: string, title = "New Chat"): Chat {
+interface CreateChatOptions {
+  title?: string;
+  contactId?: string;
+  contactName?: string;
+  templateId?: string;
+  agentConfig?: AgentConfig;
+}
+
+export function createChat(id: string, options: string | CreateChatOptions = {}): Chat {
   const dir = chatDir(id);
   fs.mkdirSync(dir, { recursive: true });
+
+  // Support old string signature for backwards compat
+  const opts: CreateChatOptions =
+    typeof options === "string" ? { title: options } : options;
+
+  const title = opts.contactName || opts.title || "New Chat";
+
   const chat: Chat = {
     id,
     title,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     messageCount: 0,
+    ...(opts.contactId ? { contactId: opts.contactId } : {}),
+    ...(opts.contactName ? { contactName: opts.contactName } : {}),
+    ...(opts.templateId ? { templateId: opts.templateId } : {}),
+    ...(opts.agentConfig ? { agentConfig: opts.agentConfig } : {}),
   };
   fs.writeFileSync(path.join(dir, "meta.json"), JSON.stringify(chat, null, 2));
   fs.writeFileSync(path.join(dir, "messages.md"), "");
   return chat;
+}
+
+export function getChatMeta(chatId: string): Chat | null {
+  const metaPath = path.join(chatDir(chatId), "meta.json");
+  if (!fs.existsSync(metaPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(metaPath, "utf-8")) as Chat;
+  } catch {
+    return null;
+  }
 }
 
 export function updateChatMeta(chatId: string, updates: Partial<Chat>): void {
