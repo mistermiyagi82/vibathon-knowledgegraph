@@ -7,6 +7,7 @@ import DateSeparator from "./DateSeparator";
 import MessageInput from "./MessageInput";
 import MemoryModal from "./MemoryModal";
 import ContextModal from "./ContextModal";
+import PromptModal from "./PromptModal";
 import type { Message, MessageContext, MemoryOverview } from "@/types";
 
 interface Props {
@@ -23,6 +24,7 @@ export default function ChatView({ chatId }: Props) {
   const [thinkingLabel, setThinkingLabel] = useState("");
   const [newMessageIds, setNewMessageIds] = useState<string[]>([]);
 
+  const [promptOpen, setPromptOpen] = useState(false);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [overview, setOverview] = useState<MemoryOverview | null>(null);
   const [memoryUpdated, setMemoryUpdated] = useState(false);
@@ -326,18 +328,30 @@ export default function ChatView({ chatId }: Props) {
           </button>
         </div>
 
-        {/* Memory button — gear icon */}
-        <button
-          onClick={() => setMemoryOpen(true)}
-          className="menu-fade p-1.5 rounded-lg hover:bg-ink/5 transition-colors"
-          aria-label="Memory"
-          title="Memory"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 5C10.5 5 9 5.8 8.2 7.1C7.1 6.7 5.7 7 4.9 8C4.1 9 4.1 10.4 4.8 11.4C4 12 3.7 13.1 4.1 14.1C4.5 15.1 5.5 15.7 6.5 15.7C6.7 16.9 7.7 17.8 9 18C9.6 18.6 10.5 19 11.5 19H12.5C13.5 19 14.4 18.6 15 18C16.3 17.8 17.3 16.9 17.5 15.7C18.5 15.7 19.5 15.1 19.9 14.1C20.3 13.1 20 12 19.2 11.4C19.9 10.4 19.9 9 19.1 8C18.3 7 16.9 6.7 15.8 7.1C15 5.8 13.5 5 12 5Z"/>
-              <path d="M12 5V7M8.5 8.5L10 10M15.5 8.5L14 10M6.5 13H8M16 13H17.5M9 17L10 15M15 17L14 15"/>
+        <div className="flex items-center gap-1">
+          {/* Prompt edit button */}
+          <button
+            onClick={() => setPromptOpen(true)}
+            className="menu-fade p-1.5 rounded-lg hover:bg-ink/5 transition-colors"
+            aria-label="Edit system prompt"
+            title="Edit system prompt"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
-        </button>
+          </button>
+
+          {/* Memory button — brain icon */}
+          <button
+            onClick={() => setMemoryOpen(true)}
+            className="menu-fade p-1.5 rounded-lg hover:bg-ink/5 transition-colors"
+            aria-label="Memory"
+            title="Memory"
+          >
+          🧠
+          </button>
+        </div>
       </div>
       </div>
 
@@ -411,6 +425,9 @@ export default function ChatView({ chatId }: Props) {
           chatId={chatId}
         />
       )}
+
+      {/* Prompt modal */}
+      {promptOpen && <PromptModal onClose={() => setPromptOpen(false)} />}
 
       {/* Context modal */}
       {contextMessage && (
