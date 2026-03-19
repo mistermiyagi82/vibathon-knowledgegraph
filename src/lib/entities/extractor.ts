@@ -12,14 +12,14 @@ export async function extractEntities(
   assistantResponse: string
 ): Promise<Entity[]> {
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 1024,
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 512,
     messages: [
       {
         role: "user",
-        content: `Extract all entities, facts, and relationships from this conversation exchange as JSON.
-Return ONLY a JSON array with objects of shape: { subject, relationship, object }
-Use uppercase for relationship names (e.g. PREFERS, BUILDING, USES, KNOWS_ABOUT).
+        content: `Extract entities and relationships from this exchange. Return ONLY a JSON array, no markdown, no explanation.
+Each item: { "subject": string, "relationship": string, "object": string }
+Use UPPERCASE_WITH_UNDERSCORES for relationship names (PREFERS, BUILDING, USES, KNOWS_ABOUT, DECIDED, DISCUSSED).
 
 User: ${userMessage}
 Assistant: ${assistantResponse}`,
@@ -28,8 +28,10 @@ Assistant: ${assistantResponse}`,
   });
 
   try {
-    const text = response.content[0].type === "text" ? response.content[0].text : "[]";
-    return JSON.parse(text) as Entity[];
+    const raw = response.content[0].type === "text" ? response.content[0].text : "[]";
+    // Strip markdown code fences if present
+    const json = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
+    return JSON.parse(json) as Entity[];
   } catch {
     return [];
   }

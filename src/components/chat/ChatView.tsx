@@ -12,9 +12,6 @@ interface Props {
   chatId: string;
 }
 
-function isSameDay(a: string, b: string) {
-  return a.slice(0, 10) === b.slice(0, 10);
-}
 
 export default function ChatView({ chatId }: Props) {
   const router = useRouter();
@@ -23,7 +20,7 @@ export default function ChatView({ chatId }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingContent, setStreamingContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [newMessageIds, setNewMessageIds] = useState<Set<string>>(new Set());
+  const [newMessageIds, setNewMessageIds] = useState<string[]>([]);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [selectedContext, setSelectedContext] = useState<MessageContext | null>(null);
   const [overview, setOverview] = useState<MemoryOverview | null>(null);
@@ -121,7 +118,7 @@ export default function ChatView({ chatId }: Props) {
     };
 
     setMessages((prev) => [...prev, tempUserMsg]);
-    setNewMessageIds((prev) => new Set([...prev, tempUserId]));
+    setNewMessageIds((prev) => [...prev, tempUserId]);
     setIsStreaming(true);
     setStreamingContent("");
     scrollToBottom();
@@ -193,11 +190,7 @@ export default function ChatView({ chatId }: Props) {
                 finalUserMsg,
                 finalAssistantMsg,
               ]);
-              setNewMessageIds((prev) => {
-                const next = new Set(prev);
-                next.add(finalAssistantMsg.id);
-                return next;
-              });
+              setNewMessageIds((prev) => [...prev, finalAssistantMsg.id]);
               setStreamingContent("");
               setIsStreaming(false);
 
@@ -246,7 +239,7 @@ export default function ChatView({ chatId }: Props) {
         message={msg}
         onSelect={msg.role === "assistant" ? handleSelectMessage : undefined}
         isSelected={msg.id === selectedMessageId}
-        isNew={newMessageIds.has(msg.id)}
+        isNew={newMessageIds.includes(msg.id)}
       />
     );
   }
