@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { v4 as uuid } from "uuid";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { anthropic, SYSTEM_PROMPT, MEMORY_TOOLS } from "@/lib/anthropic";
+import { anthropic, MEMORY_TOOLS } from "@/lib/anthropic";
+import { getSystemPrompt } from "@/lib/prompt";
 
 function getOpenAIClient() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? "" });
@@ -31,7 +32,7 @@ async function runOpenAICompatibleStream(
   }));
 
   const msgs: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: getSystemPrompt() },
     { role: "user", content: initialContent },
   ];
 
@@ -227,7 +228,7 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
           const claudeStream = anthropic.messages.stream({
             model,
             max_tokens: 4096,
-            system: SYSTEM_PROMPT,
+            system: getSystemPrompt(),
             tools: MEMORY_TOOLS,
             messages: msgs,
           });
@@ -372,7 +373,7 @@ async function handleMemoryCommand(chatId: string, messageId: string, userId: st
         const claudeStream = anthropic.messages.stream({
           model: "claude-sonnet-4-6",
           max_tokens: 1024,
-          system: SYSTEM_PROMPT,
+          system: getSystemPrompt(),
           messages: [
             {
               role: "user",
