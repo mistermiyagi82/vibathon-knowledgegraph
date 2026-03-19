@@ -30,7 +30,7 @@ export default function MessageInput({ onSend, disabled, autoFocus }: Props) {
     <div className="w-full">
       {/* File pill preview */}
       {file && (
-        <div className="flex items-center gap-2 mb-3 px-1">
+        <div className="flex items-center gap-2 mb-2 px-1">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/5 text-xs text-ink">
             {file.name}
             <button
@@ -46,10 +46,10 @@ export default function MessageInput({ onSend, disabled, autoFocus }: Props) {
         </div>
       )}
 
-      {/* Input row */}
-      <div className="flex items-center gap-3">
+      {/* Pill container */}
+      <div className="flex items-center gap-3 bg-black/[0.05] rounded-2xl px-5 py-4">
         {/* + file button */}
-        <label className="cursor-pointer text-muted hover:text-ink transition-colors duration-150 text-base leading-none select-none shrink-0">
+        <label className="cursor-pointer text-ink/40 hover:text-ink/70 transition-colors duration-150 text-lg leading-none select-none shrink-0 font-light">
           +
           <input
             ref={fileInputRef}
@@ -68,7 +68,7 @@ export default function MessageInput({ onSend, disabled, autoFocus }: Props) {
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSubmit()}
           placeholder="Ask anything..."
           disabled={disabled}
-          className="flex-1 bg-transparent text-sm text-ink font-light outline-none placeholder:text-muted/50 caret-ink disabled:opacity-50"
+          className="flex-1 bg-transparent text-sm text-ink font-normal outline-none placeholder:text-ink/30 caret-ink disabled:opacity-50"
           autoComplete="off"
           spellCheck={false}
         />
@@ -77,10 +77,10 @@ export default function MessageInput({ onSend, disabled, autoFocus }: Props) {
         <button
           onClick={handleSubmit}
           disabled={(!text.trim() && !file) || disabled}
-          className="text-muted hover:text-ink transition-colors duration-150 disabled:opacity-20 text-base leading-none select-none shrink-0"
+          className="text-xs font-medium tracking-widest text-ink/40 hover:text-ink/80 transition-colors duration-150 disabled:opacity-30 select-none shrink-0 uppercase"
           aria-label="Send"
         >
-          →
+          Send
         </button>
       </div>
     </div>

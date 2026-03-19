@@ -318,7 +318,7 @@ export default function ChatView({ chatId }: Props) {
         </div>
 
         {/* Input bar */}
-        <div className="px-16 py-6 border-t border-ink/6">
+        <div className="px-16 pb-8 pt-4">
           <MessageInput
             onSend={sendMessage}
             disabled={isStreaming}
