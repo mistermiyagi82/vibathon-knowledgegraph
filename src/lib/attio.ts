@@ -26,37 +26,70 @@ async function attioFetch(endpoint: string, options?: RequestInit) {
 
 // Search contacts (people) by name or email
 export async function searchAttioContacts(query: string): Promise<AttioContact[]> {
-  try {
-    // Use Attio's search endpoint
-    const data = await attioFetch("/objects/people/records/query", {
+  // Try name search and email search in parallel
+  const [nameResults, emailResults] = await Promise.allSettled([
+    attioFetch("/objects/people/records/query", {
       method: "POST",
       body: JSON.stringify({
-        filter: {
-          name: { $contains: query },
-        },
+        filter: { name: { $contains: query } },
         limit: 20,
-        sorts: [{ attribute: "name", field: "first_name", direction: "asc" }],
       }),
-    });
+    }),
+    attioFetch("/objects/people/records/query", {
+      method: "POST",
+      body: JSON.stringify({
+        filter: { email_addresses: { email_address: { $contains: query } } },
+        limit: 20,
+      }),
+    }),
+  ]);
 
-    return (data.data ?? []).map(mapAttioRecord);
-  } catch {
-    // Try email search if name search fails
-    try {
-      const data = await attioFetch("/objects/people/records/query", {
-        method: "POST",
-        body: JSON.stringify({
-          filter: {
-            email_addresses: { email_address: { $contains: query } },
-          },
-          limit: 20,
-        }),
-      });
-      return (data.data ?? []).map(mapAttioRecord);
-    } catch {
-      return [];
+  // Merge results, deduplicate by record_id
+  const seen = new Set<string>();
+  const records: AttioContact[] = [];
+
+  for (const result of [nameResults, emailResults]) {
+    if (result.status === "fulfilled") {
+      for (const record of result.value.data ?? []) {
+        const id = record.id?.record_id ?? record.id ?? "";
+        if (!seen.has(id)) {
+          seen.add(id);
+          records.push(mapAttioRecord(record));
+        }
+      }
     }
   }
+
+  // Resolve company names in parallel
+  return resolveCompanyNames(records);
+}
+
+async function resolveCompanyNames(contacts: AttioContact[]): Promise<AttioContact[]> {
+  // Collect unique company IDs that look like UUIDs (unresolved refs)
+  const uuidPattern = /^[0-9a-f-]{36}$/i;
+  const companyIds = Array.from(new Set(
+    contacts.map((c) => c.company).filter((c): c is string => !!c && uuidPattern.test(c))
+  ));
+
+  if (companyIds.length === 0) return contacts;
+
+  // Fetch all companies in parallel
+  const companyMap = new Map<string, string>();
+  await Promise.allSettled(
+    companyIds.map(async (id) => {
+      try {
+        const data = await attioFetch(`/objects/companies/records/${id}`);
+        const name = data.data?.values?.name?.[0]?.value;
+        if (name) companyMap.set(id, name);
+      } catch { /* skip */ }
+    })
+  );
+
+  // Merge company names back
+  return contacts.map((c) => ({
+    ...c,
+    company: (c.company && companyMap.has(c.company)) ? companyMap.get(c.company) : c.company,
+  }));
 }
 
 // Get a single contact by record ID
@@ -102,17 +135,23 @@ function mapAttioRecord(record: any): AttioContact {
   if (!record) return { id: "", name: "Unknown" };
   const values = record.values ?? {};
 
-  const firstName = values.first_name?.[0]?.value ?? "";
-  const lastName = values.last_name?.[0]?.value ?? "";
-  const name = [firstName, lastName].filter(Boolean).join(" ") || "Unknown";
+  // Attio v2: name is stored as values.name[0].full_name (or first_name + last_name within same object)
+  const nameObj = values.name?.[0];
+  const name =
+    nameObj?.full_name ||
+    [nameObj?.first_name, nameObj?.last_name].filter(Boolean).join(" ") ||
+    "Unknown";
 
   const email = values.email_addresses?.[0]?.email_address ?? undefined;
   const phone = values.phone_numbers?.[0]?.phone_number ?? undefined;
   const jobTitle = values.job_title?.[0]?.value ?? undefined;
   const notes = values.description?.[0]?.value ?? undefined;
 
-  // Company may be a linked record
-  const companyRef = values.company?.[0]?.target_record_id ?? undefined;
+  // Company: prefer the referenced record's name if available, otherwise skip UUID
+  const companyEntry = values.company?.[0];
+  const company = companyEntry?.target_record?.values?.name?.[0]?.value
+    ?? companyEntry?.name
+    ?? undefined;
 
   return {
     id: record.id?.record_id ?? record.id ?? "",
@@ -120,7 +159,7 @@ function mapAttioRecord(record: any): AttioContact {
     email,
     phone,
     jobTitle,
-    company: companyRef, // Will be resolved separately if needed
+    company,
     notes,
   };
 }
