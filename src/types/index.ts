@@ -81,6 +81,18 @@ export interface MemoryOverview {
   };
 }
 
+export interface AttioVacancy {
+  id: string;
+  title?: string;
+  description?: string;
+  requirements?: string;
+  status?: string;            // open / closed / on-hold etc.
+  company?: string;           // Resolved company name
+  companyId?: string;         // Raw company record ID
+  companyDescription?: string;
+  companyWebsite?: string;
+}
+
 export interface AttioRecruitingEntry {
   stage?: string;
   applyingFor?: string;       // Role title (select)
@@ -92,8 +104,10 @@ export interface AttioRecruitingEntry {
   potentialStartDate?: string;
   sourceType?: string;
   source?: string;
-  hiringCompany?: string;     // company_name field on the list entry
+  hiringCompany?: string;     // company_name field (legacy text field)
   interviewDate?: string;
+  vacancyId?: string;         // Linked vacancy record ID
+  vacancy?: AttioVacancy;     // Fully resolved vacancy + company
 }
 
 export interface AttioContact {

@@ -1,7 +1,8 @@
-import type { AttioContact, AttioRecruitingEntry } from "@/types";
+import type { AttioContact, AttioRecruitingEntry, AttioVacancy } from "@/types";
 
 const ATTIO_BASE = "https://api.attio.com/v2";
 const RECRUITING_LIST_SLUG = "recruiting";
+const VACANCIES_OBJECT_SLUG = "vacancies";
 
 function getApiKey(): string {
   const key = process.env.ATTIO_API_KEY;
@@ -66,10 +67,7 @@ export async function getAttioContact(recordId: string): Promise<AttioContact | 
       attioFetch(`/objects/people/records/${recordId}`),
       attioFetch(`/lists/${RECRUITING_LIST_SLUG}/entries/query`, {
         method: "POST",
-        body: JSON.stringify({
-          filter: { parent_record_id: recordId },
-          limit: 1,
-        }),
+        body: JSON.stringify({ limit: 500 }),
       }),
     ]);
 
@@ -84,10 +82,21 @@ export async function getAttioContact(recordId: string): Promise<AttioContact | 
       } catch { /* non-critical */ }
     }
 
-    // Attach recruiting entry if found
+    // Attach recruiting entry if found — filter by parent_record_id client-side
     if (recruitingData.status === "fulfilled") {
-      const entry = recruitingData.value.data?.[0];
-      if (entry) contact.recruiting = mapRecruitingEntry(entry.entry_values ?? {});
+      const entry = (recruitingData.value.data ?? []).find(
+        (e: { parent_record_id: string }) => e.parent_record_id === recordId
+      );
+      if (entry) {
+        const recruiting = mapRecruitingEntry(entry.entry_values ?? {});
+
+        // Follow vacancy chain: recruiting entry → vacancy → company
+        if (recruiting.vacancyId) {
+          recruiting.vacancy = await resolveVacancy(recruiting.vacancyId);
+        }
+
+        contact.recruiting = recruiting;
+      }
     }
 
     return contact;
@@ -109,16 +118,34 @@ export function formatContactContext(contact: AttioContact): string {
   if (r) {
     lines.push("\n--- Recruitment ---");
     if (r.stage) lines.push(`Stage: ${r.stage}`);
-    if (r.applyingFor) lines.push(`Applying for: ${r.applyingFor}`);
-    if (r.role) lines.push(`Role: ${r.role}`);
+    if (r.employmentStatus) lines.push(`Employment type: ${r.employmentStatus}`);
     if (r.roleLevel) lines.push(`Level: ${r.roleLevel}`);
     if (r.team) lines.push(`Team: ${r.team}`);
-    if (r.hiringCompany) lines.push(`Hiring company: ${r.hiringCompany}`);
     if (r.manager) lines.push(`Manager: ${r.manager}`);
-    if (r.employmentStatus) lines.push(`Employment type: ${r.employmentStatus}`);
     if (r.potentialStartDate) lines.push(`Potential start: ${r.potentialStartDate}`);
     if (r.interviewDate) lines.push(`Interview date: ${r.interviewDate}`);
     if (r.source) lines.push(`Source: ${[r.sourceType, r.source].filter(Boolean).join(" / ")}`);
+
+    // Vacancy chain: role details + hiring company
+    const v = r.vacancy;
+    if (v) {
+      lines.push("\n--- Vacancy ---");
+      if (v.title) lines.push(`Role: ${v.title}`);
+      if (v.status) lines.push(`Vacancy status: ${v.status}`);
+      if (v.description) lines.push(`Description: ${v.description}`);
+      if (v.requirements) lines.push(`Requirements: ${v.requirements}`);
+      if (v.company) {
+        lines.push("\n--- Hiring Company ---");
+        lines.push(`Company: ${v.company}`);
+        if (v.companyWebsite) lines.push(`Website: ${v.companyWebsite}`);
+        if (v.companyDescription) lines.push(`About: ${v.companyDescription}`);
+      }
+    } else {
+      // Fallback to legacy text fields
+      if (r.applyingFor) lines.push(`Applying for: ${r.applyingFor}`);
+      if (r.role) lines.push(`Role: ${r.role}`);
+      if (r.hiringCompany) lines.push(`Hiring company: ${r.hiringCompany}`);
+    }
   }
 
   return lines.join("\n");
@@ -198,7 +225,35 @@ function mapRecruitingEntry(ev: any): AttioRecruitingEntry {
     potentialStartDate: ev.potential_start_date?.[0]?.value ?? undefined,
     sourceType: ev.source_type?.[0]?.option?.title ?? undefined,
     source: ev.source?.[0]?.option?.title ?? undefined,
-    hiringCompany: ev.company_name?.[0]?.value ?? undefined,
+    hiringCompany: ev.hiring_company?.[0]?.target_record_id ?? ev.company_name?.[0]?.value ?? undefined,
     interviewDate: ev.interview_date?.[0]?.value ?? undefined,
+    // Linked vacancy record (resolved separately)
+    vacancyId: ev.vacancy?.[0]?.target_record_id ?? undefined,
   };
+}
+
+async function resolveVacancy(vacancyId: string): Promise<AttioVacancy> {
+  const vacancy: AttioVacancy = { id: vacancyId };
+  try {
+    const data = await attioFetch(`/objects/${VACANCIES_OBJECT_SLUG}/records/${vacancyId}`);
+    const v = data.data?.values ?? {};
+    vacancy.title = v.title?.[0]?.value ?? undefined;
+    vacancy.description = v.description?.[0]?.value ?? undefined;
+    vacancy.requirements = v.requirements?.[0]?.value ?? undefined;
+    vacancy.status = v.status?.[0]?.option?.title ?? v.status?.[0]?.value ?? undefined;
+
+    // Follow vacancy → company chain
+    const companyId = v.company?.[0]?.target_record_id ?? undefined;
+    if (companyId) {
+      vacancy.companyId = companyId;
+      try {
+        const companyData = await attioFetch(`/objects/companies/records/${companyId}`);
+        const cv = companyData.data?.values ?? {};
+        vacancy.company = cv.name?.[0]?.value ?? undefined;
+        vacancy.companyDescription = cv.description?.[0]?.value ?? undefined;
+        vacancy.companyWebsite = cv.domains?.[0]?.domain ?? undefined;
+      } catch { /* non-critical */ }
+    }
+  } catch { /* non-critical */ }
+  return vacancy;
 }
