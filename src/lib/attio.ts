@@ -156,6 +156,7 @@ export function formatContactContext(contact: AttioContact): string {
   const r = contact.recruiting;
   if (r) {
     lines.push("\n--- Recruitment ---");
+    if (r.entryId) lines.push(`Entry ID: ${r.entryId}`);
     if (r.stage) lines.push(`Stage: ${r.stage}`);
     if (r.employmentStatus) lines.push(`Employment type: ${r.employmentStatus}`);
     if (r.roleLevel) lines.push(`Level: ${r.roleLevel}`);
