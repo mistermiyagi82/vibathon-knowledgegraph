@@ -3,8 +3,8 @@ import fs from "fs";
 import path from "path";
 import type { Template } from "@/types";
 
-const DATA_PATH = process.env.DATA_PATH || "./data";
-const TEMPLATES_DIR = path.join(DATA_PATH, "templates");
+// Templates live in /templates at the project root (tracked in git, not in data volume)
+const TEMPLATES_DIR = path.join(process.cwd(), "templates");
 
 // GET /api/templates — list all templates
 export async function GET() {

@@ -29,7 +29,7 @@ export async function POST(req: Request) {
 
     // Load template config if templateId provided
     if (templateId) {
-      const templatePath = path.join(DATA_PATH, "templates", `${templateId}.json`);
+      const templatePath = path.join(process.cwd(), "templates", `${templateId}.json`);
       if (fs.existsSync(templatePath)) {
         const template = JSON.parse(fs.readFileSync(templatePath, "utf-8"));
         agentConfig = {
