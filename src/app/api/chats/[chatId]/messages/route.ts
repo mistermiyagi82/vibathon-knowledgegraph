@@ -3,6 +3,7 @@ import { v4 as uuid } from "uuid";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { anthropic, MEMORY_TOOLS } from "@/lib/anthropic";
+import { calculateCost } from "@/lib/pricing";
 import { getSystemPrompt } from "@/lib/prompt";
 import { queryGraphMemory } from "@/lib/memory/graph";
 import { semanticSearch } from "@/lib/memory/semantic";
@@ -56,7 +57,7 @@ async function executeTool(
     };
   }
   if (name === "search_history") {
-    const excerpts = await semanticSearch(input.query ?? "", chatId);
+    const excerpts = await semanticSearch(input.query ?? "");
     return {
       result:
         excerpts.map((e) => `[${e.chatTitle}] ${e.excerpt}`).join("\n\n") ||
@@ -111,7 +112,7 @@ async function runOpenAICompatibleStream(
   perf: { step: string; ms: number }[],
   emit: (payload: object) => void,
   t: () => number
-): Promise<string> {
+): Promise<{ response: string; inputTokens: number; outputTokens: number; cacheReadTokens: number }> {
   const oaiTools: OpenAI.Chat.ChatCompletionTool[] = MEMORY_TOOLS.map((tool) => ({
     type: "function" as const,
     function: { name: tool.name, description: tool.description, parameters: tool.input_schema },
@@ -124,6 +125,9 @@ async function runOpenAICompatibleStream(
 
   let fullResponse = "";
   let toolsSupported = true;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let totalCacheReadTokens = 0;
 
   for (let i = 0; i < 5; i++) {
     const start = t();
@@ -133,15 +137,21 @@ async function runOpenAICompatibleStream(
 
     let oaiStream: AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
     try {
-      oaiStream = await client.chat.completions.create({ model, stream: true, ...(toolsSupported ? { tools: oaiTools } : {}), messages: msgs });
+      oaiStream = await client.chat.completions.create({ model, stream: true, stream_options: { include_usage: true }, ...(toolsSupported ? { tools: oaiTools } : {}), messages: msgs });
     } catch (err: unknown) {
       if (toolsSupported && typeof err === "object" && err !== null && "status" in err && (err as { status: number }).status === 400) {
         toolsSupported = false;
-        oaiStream = await client.chat.completions.create({ model, stream: true, messages: msgs });
+        oaiStream = await client.chat.completions.create({ model, stream: true, stream_options: { include_usage: true }, messages: msgs });
       } else { throw err; }
     }
 
     for await (const chunk of oaiStream) {
+      if (chunk.usage) {
+        totalInputTokens += chunk.usage.prompt_tokens ?? 0;
+        totalOutputTokens += chunk.usage.completion_tokens ?? 0;
+        totalCacheReadTokens += (chunk.usage as { prompt_tokens_details?: { cached_tokens?: number } }).prompt_tokens_details?.cached_tokens ?? 0;
+      }
+
       const delta = chunk.choices[0]?.delta;
       finishReason = chunk.choices[0]?.finish_reason ?? finishReason;
 
@@ -192,7 +202,7 @@ async function runOpenAICompatibleStream(
     msgs.push(...toolResults);
   }
 
-  return fullResponse;
+  return { response: fullResponse, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, cacheReadTokens: totalCacheReadTokens };
 }
 
 // POST /api/chats/:chatId/messages — send a message and stream Claude's response
@@ -254,11 +264,24 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
       const perf: { step: string; ms: number }[] = [];
       const t = () => Date.now();
 
+      let inputTokens = 0;
+      let outputTokens = 0;
+      let cacheReadTokens = 0;
+      let cacheWriteTokens = 0;
+
       try {
         if (isOpenAIModel(model)) {
-          fullResponse = await runOpenAICompatibleStream(getOpenAIClient(), model, systemPrompt, initialContent, chatId, context, perf, emit, t);
+          const result = await runOpenAICompatibleStream(getOpenAIClient(), model, systemPrompt, initialContent, chatId, context, perf, emit, t);
+          fullResponse = result.response;
+          inputTokens = result.inputTokens;
+          outputTokens = result.outputTokens;
+          cacheReadTokens = result.cacheReadTokens;
         } else if (isGroqModel(model)) {
-          fullResponse = await runOpenAICompatibleStream(getGroqClient(), model, systemPrompt, initialContent, chatId, context, perf, emit, t);
+          const result = await runOpenAICompatibleStream(getGroqClient(), model, systemPrompt, initialContent, chatId, context, perf, emit, t);
+          fullResponse = result.response;
+          inputTokens = result.inputTokens;
+          outputTokens = result.outputTokens;
+          cacheReadTokens = result.cacheReadTokens;
         } else {
           // Anthropic Claude path
           const msgs: Anthropic.MessageParam[] = [{ role: "user", content: initialContent }];
@@ -293,6 +316,12 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
             if (firstToken) {
               perf.push({ step: `Claude API call ${i + 1}`, ms: t() - claudeStart });
             }
+
+            inputTokens      += finalMessage.usage.input_tokens;
+            outputTokens     += finalMessage.usage.output_tokens;
+            cacheReadTokens  += (finalMessage.usage as { cache_read_input_tokens?: number }).cache_read_input_tokens  ?? 0;
+            cacheWriteTokens += (finalMessage.usage as { cache_creation_input_tokens?: number }).cache_creation_input_tokens ?? 0;
+
             if (finalMessage.stop_reason !== "tool_use") break;
 
             msgs.push({ role: "assistant", content: finalMessage.content });
@@ -327,8 +356,10 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
           model,
         };
 
+        const usage = calculateCost(model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens);
+
         await Promise.all([
-          appendMessage(chatId, userMessage, assistantMessage, context, perf),
+          appendMessage(chatId, userMessage, assistantMessage, context, perf, usage),
           processConversation(chatId, userText, fullResponse).catch(() => {}),
           indexExchange(chatId, userText, fullResponse, now).catch(() => {}),
         ]);
@@ -346,7 +377,7 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
           updateChatMeta(chatId, { updatedAt: now });
         }
 
-        emit({ done: true, messageId, userMessageId: userId, context, title, perf });
+        emit({ done: true, messageId, userMessageId: userId, context, title, perf, usage });
       } catch (err) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: String(err) })}\n\n`));
       } finally {

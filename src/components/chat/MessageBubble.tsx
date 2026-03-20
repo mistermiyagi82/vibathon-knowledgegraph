@@ -60,6 +60,16 @@ export default function MessageBubble({ message, streaming, onOpenContext, isAct
                 <span className="text-muted/30 font-bold">→</span>total {message.perf.filter(p => p.ms >= 0).reduce((sum, p) => sum + p.ms, 0)}ms
               </span>
             )}
+            {message.usage && (
+              <span className="text-[10px] font-mono text-muted/60 flex items-center gap-x-3">
+                <span className="text-muted/30 font-bold">·</span>
+                {message.usage.totalTokens.toLocaleString()} tokens
+                <span className="text-muted/30 font-bold">·</span>
+                €{message.usage.costEur < 0.01
+                  ? message.usage.costEur.toFixed(4).replace(".", ",")
+                  : message.usage.costEur.toFixed(2).replace(".", ",")}
+              </span>
+            )}
           </div>
         )}
       </div>

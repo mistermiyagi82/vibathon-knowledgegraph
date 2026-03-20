@@ -207,6 +207,7 @@ export default function ChatView({ chatId }: Props) {
                 context,
                 perf: payload.perf,
                 model: model,
+                usage: payload.usage,
               };
 
               setMessages((prev) => [

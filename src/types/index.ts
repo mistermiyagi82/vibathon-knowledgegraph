@@ -23,6 +23,15 @@ export interface PerfEntry {
   ms: number;
 }
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  totalTokens: number;
+  costEur: number;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
@@ -32,6 +41,7 @@ export interface Message {
   context?: MessageContext;
   perf?: PerfEntry[];
   model?: string;
+  usage?: TokenUsage;
 }
 
 export interface FileAttachment {
