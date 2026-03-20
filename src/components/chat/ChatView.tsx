@@ -43,7 +43,7 @@ export default function ChatView({ chatId }: Props) {
     { id: "claude-sonnet-4-20250514", label: "Sonnet 4" },
     { id: "claude-3-haiku-20240307", label: "Haiku 3" },
   ];
-  const [model, setModel] = useState(() => localStorage.getItem("selected-model") ?? "claude-sonnet-4-6");
+  const [model, setModel] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("selected-model") : null) ?? "claude-sonnet-4-6");
 
 
   const [menuOpen, setMenuOpen] = useState(false);
