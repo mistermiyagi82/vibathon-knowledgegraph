@@ -22,3 +22,12 @@ export function formatRecentMessages(messages: Message[]): string {
     .map((m) => `${m.role === "user" ? "User" : "Claude"}: ${m.content}`)
     .join("\n\n");
 }
+
+// Keyword search across all messages in a chat — exact case-insensitive match
+export function grepHistory(chatId: string, keyword: string, limit = 10): Message[] {
+  const messages = parseMessages(chatId);
+  const lower = keyword.toLowerCase();
+  return messages
+    .filter((m) => m.content.toLowerCase().includes(lower))
+    .slice(-limit);
+}

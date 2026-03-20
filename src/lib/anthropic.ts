@@ -92,6 +92,21 @@ export const MEMORY_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "grep_history",
+    description:
+      "Search this conversation for messages containing an exact word or phrase. Use this when you need to find specific names, terms, or quotes — unlike search_history which uses semantic similarity, this does exact keyword matching.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        keyword: {
+          type: "string",
+          description: "The exact word or phrase to search for, e.g. 'Dylan' or 'next Tuesday'",
+        },
+      },
+      required: ["keyword"],
+    },
+  },
+  {
     name: "get_attio_contact",
     description:
       "Retrieve the full Attio CRM profile for the current candidate — their background, experience, current recruitment status, and any notes. Use this when you need fresh or detailed candidate information.",

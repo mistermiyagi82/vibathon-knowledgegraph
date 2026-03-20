@@ -7,7 +7,7 @@ import { calculateCost } from "@/lib/pricing";
 import { getSystemPrompt } from "@/lib/prompt";
 import { queryGraphMemory } from "@/lib/memory/graph";
 import { semanticSearch } from "@/lib/memory/semantic";
-import { getRecentMessages, getMessages, formatRecentMessages } from "@/lib/memory/recent";
+import { getRecentMessages, getMessages, formatRecentMessages, grepHistory } from "@/lib/memory/recent";
 import { appendMessage, updateChatMeta, getChatMeta } from "@/lib/storage/chats";
 import { listChatFiles, readFileContents } from "@/lib/storage/files";
 import { processConversation } from "@/lib/memory/processor";
@@ -36,6 +36,7 @@ function getThinkingLabel(toolName: string): string {
     case "search_history": return "Looking through past conversations...";
     case "get_recent_messages": return "Reading recent messages...";
     case "get_chat_history": return "Looking through conversation history...";
+    case "grep_history": return "Searching for exact matches...";
     case "get_attio_contact": return "Looking up candidate profile...";
     case "get_calendar_availability": return "Checking calendar availability...";
     default: return "Thinking...";
@@ -78,6 +79,16 @@ async function executeTool(
     const msgs = getMessages(chatId, offset, limit);
     return {
       result: formatRecentMessages(msgs) || "No messages found at that position.",
+      partialContext: {},
+    };
+  }
+  if (name === "grep_history") {
+    const keyword = input.keyword ?? "";
+    if (!keyword) return { result: "No keyword provided.", partialContext: {} };
+    const matches = grepHistory(chatId, keyword, 20);
+    if (matches.length === 0) return { result: `No messages found containing "${keyword}".`, partialContext: {} };
+    return {
+      result: matches.map((m) => `${m.role === "user" ? "User" : "Claude"}: ${m.content}`).join("\n\n"),
       partialContext: {},
     };
   }
