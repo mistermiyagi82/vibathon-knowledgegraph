@@ -71,15 +71,31 @@ export interface MemoryOverview {
   };
 }
 
+export interface AttioRecruitingEntry {
+  stage?: string;
+  applyingFor?: string;       // Role title (select)
+  role?: string;              // Free-text role description
+  roleLevel?: string;
+  team?: string;
+  manager?: string;
+  employmentStatus?: string;
+  potentialStartDate?: string;
+  sourceType?: string;
+  source?: string;
+  hiringCompany?: string;     // company_name field on the list entry
+  interviewDate?: string;
+}
+
 export interface AttioContact {
   id: string;
   name: string;
   email?: string;
   phone?: string;
-  company?: string;
+  company?: string;           // Current employer (linked company record)
+  companyId?: string;         // Raw company record ID for further lookups
   jobTitle?: string;
   notes?: string;
-  status?: string;
+  recruiting?: AttioRecruitingEntry;
 }
 
 export interface Template {
