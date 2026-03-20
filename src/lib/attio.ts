@@ -105,6 +105,45 @@ export async function getAttioContact(recordId: string): Promise<AttioContact | 
   }
 }
 
+// Stage pipeline — ordered list of all stages with their Attio status IDs
+export const RECRUITING_STAGES = [
+  { id: "046aec2e-7150-4810-a494-41b5969f8ed3", title: "New" },
+  { id: "5852454e-68a4-444b-bfb1-79fd3959f104", title: "Screening by Daisy" },
+  { id: "3b0416cf-aca1-45c9-bfe2-6351fffafeeb", title: "Proposed" },
+  { id: "01cc90c3-96ea-47ec-b17a-f4f934620ce0", title: "Scheduling Interview" },
+  { id: "1979590f-15ec-49d8-b978-531db42f9175", title: "Interview Planned" },
+  { id: "f1809efd-4005-4548-820c-4c7037df00d9", title: "Final Interview Planned" },
+  { id: "a4a089d3-10fc-4807-bcf1-bd987b203915", title: "Wait for feedback" },
+  { id: "649d0f6a-e76d-4248-b5ab-d94711306354", title: "Hired" },
+  { id: "26174821-f090-4abe-b340-03063423150a", title: "Rejected after Interview" },
+  { id: "ae9761b6-cdc0-47d1-90de-afe70b080b68", title: "Rejected" },
+  { id: "b06ee9e5-1f35-4c67-b065-ea71c97724a4", title: "Candidate dropped out" },
+];
+
+// Update a candidate's stage in the recruiting list
+export async function updateCandidateStage(entryId: string, stageName: string): Promise<string> {
+  const stage = RECRUITING_STAGES.find(
+    (s) => s.title.toLowerCase() === stageName.toLowerCase()
+  );
+  if (!stage) {
+    const names = RECRUITING_STAGES.map((s) => s.title).join(", ");
+    return `Unknown stage "${stageName}". Available stages: ${names}`;
+  }
+
+  await attioFetch(`/lists/${RECRUITING_LIST_SLUG}/entries/${entryId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      data: {
+        entry_values: {
+          stage: [{ status: stage.id }],
+        },
+      },
+    }),
+  });
+
+  return `Stage updated to "${stage.title}"`;
+}
+
 // Format a contact as a rich context block for the agent's system prompt
 export function formatContactContext(contact: AttioContact): string {
   const lines: string[] = [`Name: ${contact.name}`];
@@ -229,6 +268,7 @@ function mapRecruitingEntry(ev: any): AttioRecruitingEntry {
     interviewDate: ev.interview_date?.[0]?.value ?? undefined,
     // Linked vacancy record (resolved separately)
     vacancyId: ev.vacancy?.[0]?.target_record_id ?? undefined,
+    entryId: ev.entry_id?.[0]?.value ?? undefined,
   };
 }
 

@@ -122,6 +122,25 @@ export const MEMORY_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "update_candidate_stage",
+    description:
+      "Move a candidate to a different stage in the recruiting pipeline. Use this when the recruiter asks to advance, move, or update the candidate's stage. The pipeline order is: New → Screening by Daisy → Proposed → Scheduling Interview → Interview Planned → Final Interview Planned → Wait for feedback → Hired. Terminal stages: Rejected after Interview, Rejected, Candidate dropped out.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        entry_id: {
+          type: "string",
+          description: "The recruiting list entry ID for this candidate (available from chat context)",
+        },
+        stage: {
+          type: "string",
+          description: "The exact stage name to move to, e.g. 'Screening by Daisy', 'Proposed', 'Interview Planned'",
+        },
+      },
+      required: ["entry_id", "stage"],
+    },
+  },
+  {
     name: "get_calendar_availability",
     description:
       "Check Daniel or Daisy's Google Calendar for available meeting slots. Use this when a candidate wants to schedule an interview or meeting, or when you need to propose times.",

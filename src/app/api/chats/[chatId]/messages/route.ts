@@ -13,7 +13,7 @@ import { listChatFiles, readFileContents } from "@/lib/storage/files";
 import { processConversation } from "@/lib/memory/processor";
 import { embedText } from "@/lib/memory/embed";
 import { indexChunk } from "@/lib/memory/vectordb";
-import { getAttioContact, formatContactContext } from "@/lib/attio";
+import { getAttioContact, formatContactContext, updateCandidateStage } from "@/lib/attio";
 import { getCalendarAvailability, formatAvailability } from "@/lib/calendar";
 import fs from "fs";
 import path from "path";
@@ -38,6 +38,7 @@ function getThinkingLabel(toolName: string): string {
     case "get_chat_history": return "Looking through conversation history...";
     case "grep_history": return "Searching for exact matches...";
     case "get_attio_contact": return "Looking up candidate profile...";
+    case "update_candidate_stage": return "Updating stage in Attio...";
     case "get_calendar_availability": return "Checking calendar availability...";
     default: return "Thinking...";
   }
@@ -101,6 +102,12 @@ async function executeTool(
       result: formatContactContext(contact),
       partialContext: {},
     };
+  }
+  if (name === "update_candidate_stage") {
+    const { entry_id, stage } = input;
+    if (!entry_id || !stage) return { result: "entry_id and stage are required.", partialContext: {} };
+    const result = await updateCandidateStage(entry_id, stage);
+    return { result, partialContext: {} };
   }
   if (name === "get_calendar_availability") {
     const person = input.person as "daniel" | "daisy";

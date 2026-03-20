@@ -108,6 +108,7 @@ export interface AttioRecruitingEntry {
   interviewDate?: string;
   vacancyId?: string;         // Linked vacancy record ID
   vacancy?: AttioVacancy;     // Fully resolved vacancy + company
+  entryId?: string;           // Recruiting list entry ID (needed for stage updates)
 }
 
 export interface AttioContact {
