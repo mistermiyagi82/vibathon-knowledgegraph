@@ -241,7 +241,17 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
 
   // Load chat meta for per-chat config and contact injection
   const chatMeta = getChatMeta(chatId);
-  const systemPrompt = getSystemPrompt(chatId);
+  let systemPrompt = getSystemPrompt(chatId);
+
+  // Always inject Attio contact into system prompt if chat has a contactId
+  if (chatMeta?.contactId) {
+    try {
+      const contact = await getAttioContact(chatMeta.contactId);
+      if (contact) {
+        systemPrompt += `\n\n---\n\n[Candidate Profile — always available, no need to fetch]\n${formatContactContext(contact)}`;
+      }
+    } catch { /* non-critical */ }
+  }
 
   // Read uploaded files for this chat and inject contents
   const chatFiles = listChatFiles(chatId);
@@ -252,22 +262,10 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
     })
     .filter((b): b is string => b !== null);
 
-  // Auto-inject Attio contact context on first message if chat has a contactId
-  let contactContextBlock = "";
-  if (isFirstMessage && chatMeta?.contactId) {
-    try {
-      const contact = await getAttioContact(chatMeta.contactId);
-      if (contact) {
-        contactContextBlock = `\n\n[Candidate Profile from Attio]\n${formatContactContext(contact)}`;
-      }
-    } catch { /* non-critical */ }
-  }
-
   const initialContent =
     [
       userText,
       fileBlocks.length > 0 ? `\n\n[Files in this conversation]\n${fileBlocks.join("\n\n")}` : "",
-      contactContextBlock,
     ]
       .filter(Boolean)
       .join("");
