@@ -442,7 +442,7 @@ export default function ChatView({ chatId }: Props) {
       )}
 
       {/* Prompt modal */}
-      {promptOpen && <PromptModal onClose={() => setPromptOpen(false)} />}
+      {promptOpen && <PromptModal chatId={chatId} onClose={() => setPromptOpen(false)} />}
 
       {/* Context modal */}
       {contextMessage && (

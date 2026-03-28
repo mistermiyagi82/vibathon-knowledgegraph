@@ -14,6 +14,7 @@ import { processConversation } from "@/lib/memory/processor";
 import { embedText } from "@/lib/memory/embed";
 import { indexChunk } from "@/lib/memory/vectordb";
 import { getAttioContact, formatContactContext, updateCandidateStage } from "@/lib/attio";
+import { graphitiSearch, graphitiIngestEpisode, graphitiHealthy } from "@/lib/graphiti";
 import { getCalendarAvailability, formatAvailability } from "@/lib/calendar";
 import fs from "fs";
 import path from "path";
@@ -39,6 +40,7 @@ function getThinkingLabel(toolName: string): string {
     case "grep_history": return "Searching for exact matches...";
     case "get_attio_contact": return "Looking up candidate profile...";
     case "update_candidate_stage": return "Updating stage in Attio...";
+    case "query_graph": return "Searching knowledge graph...";
     case "get_calendar_availability": return "Checking calendar availability...";
     default: return "Thinking...";
   }
@@ -98,6 +100,8 @@ async function executeTool(
     if (!contactId) return { result: "No contact_id provided.", partialContext: {} };
     const contact = await getAttioContact(contactId);
     if (!contact) return { result: "Contact not found in Attio.", partialContext: {} };
+    // Refresh cache after explicit fetch
+    updateChatMeta(chatId, { cachedContact: contact });
     return {
       result: formatContactContext(contact),
       partialContext: {},
@@ -108,6 +112,16 @@ async function executeTool(
     if (!entry_id || !stage) return { result: "entry_id and stage are required.", partialContext: {} };
     const result = await updateCandidateStage(entry_id, stage);
     return { result, partialContext: {} };
+  }
+  if (name === "query_graph") {
+    const query = input.query ?? "";
+    if (!query) return { result: "No query provided.", partialContext: {} };
+    try {
+      const result = await graphitiSearch(query, [chatId]);
+      return { result: result || "No relevant graph facts found.", partialContext: {} };
+    } catch {
+      return { result: "Knowledge graph unavailable — is the graphiti service running?", partialContext: {} };
+    }
   }
   if (name === "get_calendar_availability") {
     const person = input.person as "daniel" | "daisy";
@@ -129,7 +143,8 @@ async function runOpenAICompatibleStream(
   context: MessageContext,
   perf: { step: string; ms: number }[],
   emit: (payload: object) => void,
-  t: () => number
+  t: () => number,
+  history: OpenAI.Chat.ChatCompletionMessageParam[] = []
 ): Promise<{ response: string; inputTokens: number; outputTokens: number; cacheReadTokens: number }> {
   const oaiTools: OpenAI.Chat.ChatCompletionTool[] = MEMORY_TOOLS.map((tool) => ({
     type: "function" as const,
@@ -138,6 +153,7 @@ async function runOpenAICompatibleStream(
 
   const msgs: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
+    ...history,
     { role: "user", content: initialContent },
   ];
 
@@ -243,10 +259,14 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
   const chatMeta = getChatMeta(chatId);
   let systemPrompt = getSystemPrompt(chatId);
 
-  // Always inject Attio contact into system prompt if chat has a contactId
+  // Inject Attio contact into system prompt — use cache first, fetch once if missing
   if (chatMeta?.contactId) {
     try {
-      const contact = await getAttioContact(chatMeta.contactId);
+      let contact = chatMeta.cachedContact ?? null;
+      if (!contact) {
+        contact = await getAttioContact(chatMeta.contactId);
+        if (contact) updateChatMeta(chatId, { cachedContact: contact });
+      }
       if (contact) {
         systemPrompt += `\n\n---\n\n[Candidate Profile — always available, no need to fetch]\n${formatContactContext(contact)}`;
       }
@@ -285,22 +305,36 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
       let cacheReadTokens = 0;
       let cacheWriteTokens = 0;
 
+      // Load conversation history to pass as context
+      const historyMessages = getRecentMessages(chatId, 20);
+      const anthropicHistory: Anthropic.MessageParam[] = historyMessages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+      const openaiHistory: OpenAI.Chat.ChatCompletionMessageParam[] = historyMessages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+
       try {
         if (isOpenAIModel(model)) {
-          const result = await runOpenAICompatibleStream(getOpenAIClient(), model, systemPrompt, initialContent, chatId, context, perf, emit, t);
+          const result = await runOpenAICompatibleStream(getOpenAIClient(), model, systemPrompt, initialContent, chatId, context, perf, emit, t, openaiHistory);
           fullResponse = result.response;
           inputTokens = result.inputTokens;
           outputTokens = result.outputTokens;
           cacheReadTokens = result.cacheReadTokens;
         } else if (isGroqModel(model)) {
-          const result = await runOpenAICompatibleStream(getGroqClient(), model, systemPrompt, initialContent, chatId, context, perf, emit, t);
+          const result = await runOpenAICompatibleStream(getGroqClient(), model, systemPrompt, initialContent, chatId, context, perf, emit, t, openaiHistory);
           fullResponse = result.response;
           inputTokens = result.inputTokens;
           outputTokens = result.outputTokens;
           cacheReadTokens = result.cacheReadTokens;
         } else {
           // Anthropic Claude path
-          const msgs: Anthropic.MessageParam[] = [{ role: "user", content: initialContent }];
+          const msgs: Anthropic.MessageParam[] = [
+            ...anthropicHistory,
+            { role: "user", content: initialContent },
+          ];
 
           for (let i = 0; i < 5; i++) {
             const claudeStart = t();
@@ -378,6 +412,11 @@ export async function POST(req: Request, { params }: { params: { chatId: string 
           appendMessage(chatId, userMessage, assistantMessage, context, perf, usage),
           processConversation(chatId, userText, fullResponse).catch(() => {}),
           indexExchange(chatId, userText, fullResponse, now).catch(() => {}),
+          graphitiHealthy().then((ok) => {
+            if (!ok) return;
+            const episode = `User: ${userText}\nAssistant: ${fullResponse}`;
+            return graphitiIngestEpisode(chatId, `msg-${userId}`, episode).catch(() => {});
+          }),
         ]);
 
         let title: string | undefined;

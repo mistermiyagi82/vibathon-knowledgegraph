@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { v4 as uuid } from "uuid";
-import { listChats, createChat } from "@/lib/storage/chats";
+import { listChats, createChat, updateChatMeta } from "@/lib/storage/chats";
+import { getAttioContact } from "@/lib/attio";
+import { graphitiIngestContact, graphitiHealthy } from "@/lib/graphiti";
 import fs from "fs";
 import path from "path";
 import type { AgentConfig } from "@/types";
@@ -42,5 +44,19 @@ export async function POST(req: Request) {
   } catch { /* use defaults */ }
 
   const chat = createChat(id, { contactId, contactName, templateId, agentConfig });
+
+  // Await Attio fetch before returning — guarantees cache is ready before first message
+  if (contactId) {
+    const contact = await getAttioContact(contactId).catch(() => null);
+    if (contact) {
+      updateChatMeta(id, { cachedContact: contact });
+      // Fire-and-forget: ingest candidate profile + vacancy into Graphiti knowledge graph
+      graphitiHealthy().then((ok) => {
+        if (!ok) return;
+        return graphitiIngestContact(id, contact).catch(() => {});
+      });
+    }
+  }
+
   return NextResponse.json(chat, { status: 201 });
 }

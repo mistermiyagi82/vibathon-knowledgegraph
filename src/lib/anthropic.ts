@@ -141,6 +141,21 @@ export const MEMORY_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "query_graph",
+    description:
+      "Search the knowledge graph for rich relational facts — relationships between entities, temporal facts (things that changed over time), connections between people/companies/skills. Use this for questions like 'how are X and Y related?', 'what changed about this candidate?', 'who has similar skills to X?'. More powerful than query_memory for relational questions.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description: "What relationship or fact to look for, e.g. 'Eelke Blonk salary expectations' or 'candidates with React skills'",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
     name: "get_calendar_availability",
     description:
       "Check Daniel or Daisy's Google Calendar for available meeting slots. Use this when a candidate wants to schedule an interview or meeting, or when you need to propose times.",

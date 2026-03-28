@@ -145,6 +145,28 @@ export async function updateCandidateStage(entryId: string, stageName: string): 
 }
 
 // Format a contact as a rich context block for the agent's system prompt
+export async function uploadFileToContact(
+  recordId: string,
+  filename: string,
+  buffer: Buffer,
+  contentType: string
+): Promise<void> {
+  const apiKey = process.env.ATTIO_API_KEY;
+  if (!apiKey) return;
+
+  const formData = new FormData();
+  formData.append("file", new Blob([buffer], { type: contentType }), filename);
+  formData.append("object", "people");
+  formData.append("record_id", recordId);
+
+  await fetch(`${ATTIO_BASE}/files/upload`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: formData,
+    signal: AbortSignal.timeout(30000),
+  });
+}
+
 export function formatContactContext(contact: AttioContact): string {
   const lines: string[] = [`Name: ${contact.name}`];
   if (contact.email) lines.push(`Email: ${contact.email}`);

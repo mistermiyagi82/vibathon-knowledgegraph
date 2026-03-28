@@ -16,6 +16,7 @@ export interface Chat {
   contactName?: string;
   templateId?: string;
   agentConfig?: AgentConfig;
+  cachedContact?: AttioContact;
 }
 
 export interface PerfEntry {

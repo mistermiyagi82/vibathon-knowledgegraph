@@ -3,27 +3,40 @@
 import { useState, useEffect } from "react";
 
 interface Props {
+  chatId: string;
   onClose: () => void;
 }
 
-export default function PromptModal({ onClose }: Props) {
+export default function PromptModal({ chatId, onClose }: Props) {
   const [prompt, setPrompt] = useState("");
   const [original, setOriginal] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    fetch("/api/admin/prompt")
+    // Try to load the per-chat prompt first; fall back to global
+    fetch(`/api/chats/${chatId}`)
       .then((r) => r.json())
-      .then((d) => { setPrompt(d.prompt); setOriginal(d.prompt); });
-  }, []);
+      .then((d) => {
+        const perChat = d?.meta?.agentConfig?.systemPrompt;
+        if (perChat?.trim()) {
+          setPrompt(perChat.trim());
+          setOriginal(perChat.trim());
+        } else {
+          fetch("/api/admin/prompt")
+            .then((r) => r.json())
+            .then((g) => { setPrompt(g.prompt); setOriginal(g.prompt); });
+        }
+      });
+  }, [chatId]);
 
   async function handleSave() {
     setSaving(true);
-    await fetch("/api/admin/prompt", {
-      method: "PUT",
+    // Always save to the per-chat agentConfig so it takes effect for this agent
+    await fetch(`/api/chats/${chatId}`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ systemPrompt: prompt }),
     });
     setOriginal(prompt);
     setSaving(false);
