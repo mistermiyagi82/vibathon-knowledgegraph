@@ -72,7 +72,7 @@ export async function extractPdfText(chatId: string, filename: string): Promise<
   const filePath = path.join(DATA_PATH, "uploads", chatId, filename);
   if (!fs.existsSync(filePath)) return null;
   try {
-    const pdfParse = (await import("pdf-parse")).default;
+    const pdfParse = (await import("pdf-parse")) as unknown as (buf: Buffer) => Promise<{ text: string }>;
     const buffer = fs.readFileSync(filePath);
     const data = await pdfParse(buffer);
     const text = data.text?.trim();

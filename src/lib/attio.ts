@@ -155,7 +155,7 @@ export async function uploadFileToContact(
   if (!apiKey) return;
 
   const formData = new FormData();
-  formData.append("file", new Blob([buffer], { type: contentType }), filename);
+  formData.append("file", new Blob([new Uint8Array(buffer)], { type: contentType }), filename);
   formData.append("object", "people");
   formData.append("record_id", recordId);
 
