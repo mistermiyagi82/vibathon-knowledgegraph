@@ -36,6 +36,14 @@ export async function PATCH(req: Request, { params }: { params: { chatId: string
     meta.agentConfig = { ...(meta.agentConfig || {}), systemPrompt: body.systemPrompt };
   }
 
+  if (body.mcpServer !== undefined) {
+    if (body.mcpServer === null) {
+      delete meta.agentConfig?.mcpServer;
+    } else {
+      meta.agentConfig = { ...(meta.agentConfig || {}), mcpServer: body.mcpServer };
+    }
+  }
+
   fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
   return NextResponse.json({ ok: true });
 }

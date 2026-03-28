@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
+import dynamic from "next/dynamic";
 import type { Message, PerfEntry } from "@/types";
+
+const VVDChart = dynamic(() => import("@/components/charts/VVDChart"), { ssr: false });
 
 interface Props {
   message: Message;
@@ -62,6 +65,30 @@ export default function MessageBubble({ message, streaming, onOpenContext, isAct
             </div>
           );
         })}
+
+        {/* Tool invocations — spinners while pending, charts for VVD results */}
+        {message.toolInvocations && message.toolInvocations.length > 0 && (
+          <div className="mt-2">
+            {message.toolInvocations.map((inv) => {
+              if (inv.state !== "result") {
+                return (
+                  <div key={inv.toolCallId} className="flex items-center gap-1.5 py-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:0ms]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:150ms]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-ink/30 animate-bounce [animation-delay:300ms]" />
+                    <span className="text-xs text-ink/40 ml-1">{inv.toolName}</span>
+                  </div>
+                );
+              }
+              if (inv.toolName.startsWith("vvd_")) {
+                return (
+                  <VVDChart key={inv.toolCallId} toolName={inv.toolName} result={inv.result} />
+                );
+              }
+              return null;
+            })}
+          </div>
+        )}
 
         {!streaming && (
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">

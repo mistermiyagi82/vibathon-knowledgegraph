@@ -2,6 +2,18 @@ export interface AgentConfig {
   systemPrompt?: string; // Overrides global prompt for this chat
   model?: string;        // Model override
   tools?: string[];      // Which tools are enabled
+  mcpServer?: {
+    url: string;
+    label?: string;
+  };
+}
+
+export interface ToolInvocation {
+  toolCallId: string;
+  toolName: string;
+  state: "partial-call" | "call" | "result";
+  args?: unknown;
+  result?: unknown;
 }
 
 export interface Chat {
@@ -43,6 +55,7 @@ export interface Message {
   perf?: PerfEntry[];
   model?: string;
   usage?: TokenUsage;
+  toolInvocations?: ToolInvocation[];
 }
 
 export interface FileAttachment {
